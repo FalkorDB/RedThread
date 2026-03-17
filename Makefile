@@ -1,4 +1,4 @@
-.PHONY: install dev test lint run seed clean docker-up docker-down
+.PHONY: install dev test lint run seed clean docker-up docker-down benchmark
 
 install:
 	pip install -r requirements.txt
@@ -39,3 +39,6 @@ docker-down:
 demo: docker-up
 	@echo "RedThread is running at http://localhost:8000"
 	@echo "Demo data is loaded automatically on first launch."
+
+benchmark:
+	python -m benchmarks.run_benchmarks
