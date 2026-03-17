@@ -211,6 +211,7 @@ def get_date_range(client: FalkorDBClient) -> dict[str, str | None]:
 def get_entity_temporal_profile(
     client: FalkorDBClient,
     entity_id: str,
+    limit: int = 200,
 ) -> dict[str, Any]:
     """Get a temporal profile for an entity — when relationships formed/ended."""
     query = (
@@ -221,9 +222,10 @@ def get_entity_temporal_profile(
         "RETURN type(r) AS rel_type, direction, "
         "  r.valid_from AS vf, r.valid_to AS vt, "
         "  other.id AS other_id, other.name AS other_name, o_lbls "
-        "ORDER BY r.valid_from"
+        "ORDER BY r.valid_from "
+        "LIMIT $limit"
     )
-    result = client.ro_query(query, params={"eid": entity_id})
+    result = client.ro_query(query, params={"eid": entity_id, "limit": limit})
 
     events: list[dict[str, Any]] = []
     for row in result.result_set:

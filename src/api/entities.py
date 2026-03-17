@@ -67,12 +67,15 @@ def get_entity_relationships(
     entity_id: str,
     direction: str = Query("both", pattern="^(both|incoming|outgoing)$"),
     rel_type: str | None = None,
+    limit: int = Query(100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     """Get all relationships for an entity."""
     entity = queries.get_entity_any_label(db, entity_id)
     if not entity:
         raise HTTPException(404, "Entity not found")
-    return queries.get_entity_relationships(db, entity_id, direction=direction, rel_type=rel_type)
+    return queries.get_entity_relationships(
+        db, entity_id, direction=direction, rel_type=rel_type, limit=limit
+    )
 
 
 @router.get("/{entity_id}/neighborhood")

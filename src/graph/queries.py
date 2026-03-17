@@ -194,19 +194,23 @@ def create_relationship(
 
 
 def get_entity_relationships(
-    client: FalkorDBClient, entity_id: str, direction: str = "both", rel_type: str | None = None
+    client: FalkorDBClient,
+    entity_id: str,
+    direction: str = "both",
+    rel_type: str | None = None,
+    limit: int = 100,
 ) -> list[dict[str, Any]]:
     """Get all relationships for an entity."""
     rel_filter = f":{rel_type}" if rel_type else ""
 
     if direction == "outgoing":
-        query = f"MATCH (a {{id: $id}})-[r{rel_filter}]->(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb"
+        query = f"MATCH (a {{id: $id}})-[r{rel_filter}]->(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb LIMIT $limit"
     elif direction == "incoming":
-        query = f"MATCH (a {{id: $id}})<-[r{rel_filter}]-(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb"
+        query = f"MATCH (a {{id: $id}})<-[r{rel_filter}]-(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb LIMIT $limit"
     else:
-        query = f"MATCH (a {{id: $id}})-[r{rel_filter}]-(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb"
+        query = f"MATCH (a {{id: $id}})-[r{rel_filter}]-(b) RETURN a, r, b, labels(a) AS la, labels(b) AS lb LIMIT $limit"
 
-    result = client.ro_query(query, params={"id": entity_id})
+    result = client.ro_query(query, params={"id": entity_id, "limit": limit})
     rels = []
     for row in result.result_set:
         a_node, rel, b_node, la, lb = row

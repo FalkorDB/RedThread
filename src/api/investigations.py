@@ -170,18 +170,21 @@ def create_snapshot(investigation_id: str, data: SnapshotCreate) -> dict[str, An
 
 
 @router.get("/{investigation_id}/snapshots")
-def list_snapshots(investigation_id: str) -> list[dict[str, Any]]:
+def list_snapshots(
+    investigation_id: str,
+    limit: int = Query(100, ge=1, le=500),
+) -> list[dict[str, Any]]:
     """List snapshots for an investigation."""
     return sqlite_db.fetchall(
-        "SELECT * FROM investigation_snapshots WHERE investigation_id = ? ORDER BY created_at DESC",
-        (investigation_id,),
+        "SELECT * FROM investigation_snapshots WHERE investigation_id = ? ORDER BY created_at DESC LIMIT ?",
+        (investigation_id, limit),
     )
 
 
 # Tags
 @router.get("/tags/all")
-def list_tags() -> list[dict[str, Any]]:
-    return sqlite_db.fetchall("SELECT * FROM tags ORDER BY name")
+def list_tags(limit: int = Query(100, ge=1, le=500)) -> list[dict[str, Any]]:
+    return sqlite_db.fetchall("SELECT * FROM tags ORDER BY name LIMIT ?", (limit,))
 
 
 @router.post("/tags")

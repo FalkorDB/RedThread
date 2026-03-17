@@ -49,6 +49,7 @@ def date_range() -> dict[str, str | None]:
 @router.get("/entity/{entity_id}")
 def entity_temporal_profile(
     entity_id: str,
+    limit: int = Query(200, ge=1, le=500),
 ) -> dict[str, Any]:
     """Get temporal profile for an entity — when relationships formed and ended."""
-    return temporal.get_entity_temporal_profile(db, entity_id)
+    return temporal.get_entity_temporal_profile(db, entity_id, limit=limit)
