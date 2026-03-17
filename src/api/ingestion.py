@@ -9,6 +9,7 @@ from fastapi import APIRouter, File, HTTPException, Query, UploadFile
 from src.database.falkordb_client import db
 from src.ingestion.csv_importer import import_entities_csv, import_relationships_csv
 from src.ingestion.json_importer import import_json
+from src.ingestion.validators import VALID_LABELS, VALID_REL_TYPES
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -19,6 +20,12 @@ async def import_csv_entities(
     label: str = Query(..., description="Entity label (Person, Organization, etc.)"),
 ) -> dict[str, Any]:
     """Import entities from a CSV file."""
+    if label not in VALID_LABELS:
+        raise HTTPException(
+            400,
+            f"Invalid entity label: '{label}'. Must be one of: {sorted(VALID_LABELS)}",
+        )
+
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "File must be a CSV")
 
@@ -37,6 +44,12 @@ async def import_csv_relationships(
     rel_type: str = Query(..., description="Relationship type"),
 ) -> dict[str, Any]:
     """Import relationships from a CSV file."""
+    if rel_type not in VALID_REL_TYPES:
+        raise HTTPException(
+            400,
+            f"Invalid relationship type: '{rel_type}'. Must be one of: {sorted(VALID_REL_TYPES)}",
+        )
+
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "File must be a CSV")
 
