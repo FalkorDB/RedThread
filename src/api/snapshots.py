@@ -25,9 +25,10 @@ def create_snapshot(
 @router.get("/")
 def list_snapshots_endpoint(
     investigation_id: str | None = Query(None, description="Filter by investigation"),
+    limit: int = Query(100, ge=1, le=500),
 ) -> list[dict[str, Any]]:
     """List all saved snapshots."""
-    return diff.list_snapshots(sqlite_db, investigation_id)
+    return diff.list_snapshots(sqlite_db, investigation_id, limit=limit)
 
 
 @router.get("/{snapshot_id}")

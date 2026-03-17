@@ -92,6 +92,7 @@ def snapshot_current_graph(
 def list_snapshots(
     sqlite: SQLiteClient,
     investigation_id: str | None = None,
+    limit: int = 100,
 ) -> list[dict[str, Any]]:
     """List all snapshots, optionally filtered by investigation."""
     if investigation_id:
@@ -100,15 +101,16 @@ def list_snapshots(
             "  length(graph_state) AS state_size "
             "FROM investigation_snapshots "
             "WHERE investigation_id = ? "
-            "ORDER BY created_at DESC",
-            (investigation_id,),
+            "ORDER BY created_at DESC LIMIT ?",
+            (investigation_id, limit),
         )
     else:
         rows = sqlite.fetchall(
             "SELECT id, investigation_id, name, created_at, "
             "  length(graph_state) AS state_size "
             "FROM investigation_snapshots "
-            "ORDER BY created_at DESC"
+            "ORDER BY created_at DESC LIMIT ?",
+            (limit,),
         )
     return rows
 
