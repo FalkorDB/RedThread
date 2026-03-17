@@ -21,20 +21,27 @@ class TestComputeEntityRisk:
     def test_risk_for_low_risk_org(self, seeded_graph):
         from src.graph.risk_scoring import compute_entity_risk
 
-        # Real Corp: US jurisdiction
-        risk = compute_entity_risk(seeded_graph, "test-o2", depth=2)
-        assert risk["entity_id"] == "test-o2"
-        # US jurisdiction has low risk
-        assert risk["risk_score"] < 80
+        # Real Corp: US jurisdiction — low base risk, but Shell Corp (Panama,
+        # risk=75) is SUBSIDIARY_OF Real Corp, so propagated risk raises the
+        # total.  The important assertion is that it's less than Shell Corp's
+        # own score (which also gets a hefty base + propagated).
+        risk_real = compute_entity_risk(seeded_graph, "test-o2", depth=2)
+        risk_shell = compute_entity_risk(seeded_graph, "test-o1", depth=2)
+        assert risk_real["entity_id"] == "test-o2"
+        assert risk_real["base_risk"] < risk_shell["base_risk"]
+        assert risk_real["risk_score"] <= risk_shell["risk_score"]
 
     def test_risk_propagation_through_graph(self, seeded_graph):
         from src.graph.risk_scoring import compute_entity_risk
 
-        # John Doe directs Shell Corp (high risk) — risk should propagate
+        # John Doe (test-p1) DIRECTS Shell Corp (test-o1, high risk).
+        # With directed traversals working, propagated_risk should be > 0
+        # and include a "connected_risk" factor.
         risk = compute_entity_risk(seeded_graph, "test-p1", depth=3)
         assert risk["entity_id"] == "test-p1"
-        # Should have propagated_risk from connected high-risk org
-        assert risk["propagated_risk"] >= 0
+        assert risk["propagated_risk"] > 0
+        factor_types = [f["factor"] for f in risk["factors"]]
+        assert "connected_risk" in factor_types
 
     def test_risk_for_nonexistent_entity(self, seeded_graph):
         from src.graph.risk_scoring import compute_entity_risk
@@ -64,9 +71,22 @@ class TestComputeEntityRisk:
 
         risk_d1 = compute_entity_risk(seeded_graph, "test-p1", depth=1)
         risk_d3 = compute_entity_risk(seeded_graph, "test-p1", depth=3)
-        # Deeper search may find more connected entities (but not necessarily)
-        assert risk_d3["risk_score"] >= 0
-        assert risk_d1["risk_score"] >= 0
+        # Deeper search may find more connected entities — both should have
+        # propagated risk now that directed traversals work
+        assert risk_d3["propagated_risk"] >= risk_d1["propagated_risk"]
+        assert risk_d1["propagated_risk"] > 0
+
+    def test_propagation_deduplicates_across_directions(self, seeded_graph):
+        """If an entity is reachable both outgoing and incoming, it should only
+        count once in propagated_risk."""
+        from src.graph.risk_scoring import compute_entity_risk
+
+        risk = compute_entity_risk(seeded_graph, "test-o1", depth=3)
+        connected_ids = [
+            f["detail"] for f in risk["factors"] if f["factor"] == "connected_risk"
+        ]
+        # No two connected_risk factors should reference the same entity
+        assert len(connected_ids) == len(set(connected_ids))
 
     def test_propagated_risk_graceful_fallback(self, clean_graph):
         """Propagation query failure is handled gracefully (logged warning, risk=0)."""

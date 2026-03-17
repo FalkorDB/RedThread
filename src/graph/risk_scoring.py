@@ -91,33 +91,50 @@ def compute_entity_risk(
             base_risk += t_risk
 
     # Factor 2: Connected high-risk entities (risk propagation through graph)
+    # Use directed traversals — query both outgoing and incoming directions
+    # separately since FalkorDB doesn't support undirected shortestPath.
     prop_query = (
-        "MATCH (center {id: $id})-[:OWNS|DIRECTS|SUBSIDIARY_OF|EMPLOYED_BY*1.."
+        "MATCH path = (center {id: $id})-[:OWNS|DIRECTS|SUBSIDIARY_OF|EMPLOYED_BY*1.."
+        + str(depth)
+        + "]->(connected) "
+        "WHERE connected.risk_score > 0 AND connected.id <> $id "
+        "WITH connected, labels(connected) AS lbls, length(path) AS dist "
+        "RETURN DISTINCT connected.id, connected.name, lbls, connected.risk_score, dist "
+        "ORDER BY connected.risk_score DESC "
+        "LIMIT 20"
+    )
+    # Also check incoming direction
+    prop_query_rev = (
+        "MATCH path = (center {id: $id})<-[:OWNS|DIRECTS|SUBSIDIARY_OF|EMPLOYED_BY*1.."
         + str(depth)
         + "]-(connected) "
         "WHERE connected.risk_score > 0 AND connected.id <> $id "
-        "WITH connected, labels(connected) AS lbls, "
-        "  length(shortestPath((center)-[*]-(connected))) AS dist "
-        "WHERE center.id = $id "
-        "RETURN connected.id, connected.name, lbls, connected.risk_score, dist "
+        "WITH connected, labels(connected) AS lbls, length(path) AS dist "
+        "RETURN DISTINCT connected.id, connected.name, lbls, connected.risk_score, dist "
         "ORDER BY connected.risk_score DESC "
         "LIMIT 20"
     )
     try:
-        prop_result = client.ro_query(prop_query, params={"id": entity_id})
+        seen_ids: set[str] = set()
         propagated_risk = 0.0
-        for row in prop_result.result_set:
-            c_id, c_name, c_lbls, c_risk, dist = row
-            # Risk diminishes with distance: score / (2^distance)
-            weight = c_risk / (2**dist)
-            propagated_risk += weight
-            factors.append(
-                {
-                    "factor": "connected_risk",
-                    "detail": f"{c_name} ({c_lbls[0] if c_lbls else 'Unknown'}) at {dist} hops",
-                    "score": round(weight, 2),
-                }
-            )
+
+        for q in (prop_query, prop_query_rev):
+            prop_result = client.ro_query(q, params={"id": entity_id})
+            for row in prop_result.result_set:
+                c_id, c_name, c_lbls, c_risk, dist = row
+                if c_id in seen_ids:
+                    continue
+                seen_ids.add(c_id)
+                # Risk diminishes with distance: score / (2^distance)
+                weight = c_risk / (2**dist)
+                propagated_risk += weight
+                factors.append(
+                    {
+                        "factor": "connected_risk",
+                        "detail": f"{c_name} ({c_lbls[0] if c_lbls else 'Unknown'}) at {dist} hops",
+                        "score": round(weight, 2),
+                    }
+                )
     except Exception as e:
         logger.warning("risk_propagation_failed", entity=entity_id, error=str(e))
         propagated_risk = 0.0
