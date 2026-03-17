@@ -651,6 +651,16 @@ def seed(client: FalkorDBClient) -> dict:
     # === RELATIONSHIPS ===
     print("\n   Creating relationships...")
 
+    # Build date lookups for entities that have dates, so we can set
+    # valid_from on relationships that lack their own since/date field.
+    _entity_dates: dict[str, str] = {}
+    for e in events:
+        if e.get("date"):
+            _entity_dates[e["id"]] = e["date"]
+    for d in documents:
+        if d.get("date"):
+            _entity_dates[d["id"]] = d["date"]
+
     def _add_temporal(props: dict, default_from: str | None = None) -> dict:
         """Auto-populate valid_from/valid_to from since/until if not set."""
         if "valid_from" not in props:
@@ -1168,7 +1178,13 @@ def seed(client: FalkorDBClient) -> dict:
 
     for src, src_label, tgt, props in participations:
         create_relationship(
-            client, src_label, src, "Event", tgt, "PARTICIPATED_IN", _add_temporal(props)
+            client,
+            src_label,
+            src,
+            "Event",
+            tgt,
+            "PARTICIPATED_IN",
+            _add_temporal(props, default_from=_entity_dates.get(tgt)),
         )
 
     # Mentioned in documents
@@ -1200,7 +1216,13 @@ def seed(client: FalkorDBClient) -> dict:
 
     for src, src_label, tgt, props in mentions:
         create_relationship(
-            client, src_label, src, "Document", tgt, "MENTIONED_IN", _add_temporal(props)
+            client,
+            src_label,
+            src,
+            "Document",
+            tgt,
+            "MENTIONED_IN",
+            _add_temporal(props, default_from=_entity_dates.get(tgt)),
         )
 
     # Employed by

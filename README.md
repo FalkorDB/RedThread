@@ -194,24 +194,24 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | GET | `/api/temporal/date-range` | Get earliest/latest dates in graph |
 | GET | `/api/temporal/graph-at?date=YYYY-MM-DD` | Get graph state at a point in time |
 | GET | `/api/temporal/changes?start=X&end=Y` | Get changes between two dates |
-| GET | `/api/temporal/timeline/{entity_id}` | Relationship timeline for an entity |
-| GET | `/api/temporal/entity/{entity_id}?date=X` | Entity temporal profile at a date |
+| GET | `/api/temporal/timeline` | All dated relationships in chronological order |
+| GET | `/api/temporal/entity/{entity_id}` | Entity temporal profile |
 
 ### Snapshots & Diff
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/snapshots/` | Create a snapshot of current graph |
+| POST | `/api/snapshots/?investigation_id=X&name=Y` | Create a snapshot of current graph |
 | GET | `/api/snapshots/` | List all snapshots |
 | GET | `/api/snapshots/{id}` | Get a specific snapshot |
-| GET | `/api/snapshots/diff/{id1}/{id2}` | Diff two snapshots |
+| GET | `/api/snapshots/diff/compare?snapshot_a=X&snapshot_b=Y` | Diff two snapshots |
 | GET | `/api/snapshots/diff/current?snapshot_id=X` | Diff current graph vs a snapshot |
 
 ### Natural Language Query
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/nlq/query` | Translate and execute NL query |
+| POST | `/api/nlq/translate` | Translate NL to Cypher without executing |
 | GET | `/api/nlq/examples` | Get example NL queries |
-| GET | `/api/nlq/schema` | Get the graph schema description |
 
 ---
 

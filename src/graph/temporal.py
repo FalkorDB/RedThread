@@ -22,13 +22,14 @@ def get_graph_at_time(
     A relationship is active at time T if:
       valid_from <= T AND (valid_to IS NULL OR valid_to >= T)
 
-    For nodes, we include any node connected by at least one active relationship.
+    Relationships without valid_from are treated as always-active so they
+    are never silently dropped from temporal views.
     """
     id_match = "{id: $eid}" if entity_id else ""
 
     query = (
         f"MATCH (a {id_match})-[r]->(b) "
-        f"WHERE r.valid_from IS NOT NULL AND r.valid_from <= $pit "
+        f"WHERE (r.valid_from IS NULL OR r.valid_from <= $pit) "
         f"AND (r.valid_to IS NULL OR r.valid_to >= $pit) "
         f"WITH a, r, b, labels(a) AS a_lbls, labels(b) AS b_lbls "
         f"RETURN a, a_lbls, type(r) AS rel_type, properties(r) AS rprops, b, b_lbls "
@@ -81,7 +82,6 @@ def get_changes_between(
     Returns:
       - appeared: relationships with valid_from in [start, end]
       - disappeared: relationships with valid_to in [start, end]
-      - active_throughout: relationships active during entire period
     """
     # Relationships that appeared in the window
     appeared_q = (
@@ -198,7 +198,7 @@ def get_date_range(client: FalkorDBClient) -> dict[str, str | None]:
     """Get the earliest and latest dates in the graph."""
     query = (
         "MATCH ()-[r]->() "
-        "WHERE r.valid_from IS NOT NULL "
+        "WHERE r.valid_from IS NOT NULL AND r.valid_from <> '' "
         "RETURN min(r.valid_from) AS earliest, max(r.valid_from) AS latest"
     )
     result = client.ro_query(query)
@@ -215,7 +215,7 @@ def get_entity_temporal_profile(
     """Get a temporal profile for an entity — when relationships formed/ended."""
     query = (
         "MATCH (e {id: $eid})-[r]-(other) "
-        "WHERE r.valid_from IS NOT NULL "
+        "WHERE r.valid_from IS NOT NULL AND r.valid_from <> '' "
         "WITH r, other, labels(other) AS o_lbls, "
         "  CASE WHEN startNode(r) = e THEN 'outgoing' ELSE 'incoming' END AS direction "
         "RETURN type(r) AS rel_type, direction, "

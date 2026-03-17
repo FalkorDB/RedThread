@@ -1,5 +1,10 @@
 /** RedThread — Main Application Controller */
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 class RedThreadApp {
     constructor() {
         this.graph = null;
@@ -522,17 +527,18 @@ class RedThreadApp {
 
     _generateDateList(start, end) {
         const dates = [];
-        const s = new Date(start);
-        const e = new Date(end);
-        // Generate monthly intervals
-        const cursor = new Date(s.getFullYear(), s.getMonth(), 1);
-        while (cursor <= e) {
-            dates.push(cursor.toISOString().slice(0, 10));
-            cursor.setMonth(cursor.getMonth() + 1);
+        // Parse as YYYY-MM-DD components to avoid timezone issues
+        const [sy, sm] = start.split('-').map(Number);
+        const [ey, em, ed] = end.split('-').map(Number);
+        let year = sy, month = sm;
+        while (year < ey || (year === ey && month <= em)) {
+            dates.push(`${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`);
+            month++;
+            if (month > 12) { month = 1; year++; }
         }
-        // Always include the end date
-        const endStr = e.toISOString().slice(0, 10);
-        if (dates[dates.length - 1] !== endStr) dates.push(endStr);
+        // Always include the exact end date
+        const endStr = end;
+        if (dates.length === 0 || dates[dates.length - 1] !== endStr) dates.push(endStr);
         return dates;
     }
 
@@ -590,14 +596,30 @@ class RedThreadApp {
             data.appeared.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'change-item change-appeared';
-                div.innerHTML = `<strong>+</strong> ${c.source_name || c.source_id} <span style="color:var(--text-secondary)">${c.rel_type.replace(/_/g, ' ')}</span> → ${c.target_name || c.target_id}`;
+                const strong = document.createElement('strong');
+                strong.textContent = '+';
+                div.appendChild(strong);
+                div.appendChild(document.createTextNode(` ${c.source_name || c.source_id} `));
+                const span = document.createElement('span');
+                span.style.color = 'var(--text-secondary)';
+                span.textContent = (c.rel_type || '').replace(/_/g, ' ');
+                div.appendChild(span);
+                div.appendChild(document.createTextNode(` → ${c.target_name || c.target_id}`));
                 container.appendChild(div);
             });
 
             data.disappeared.forEach(c => {
                 const div = document.createElement('div');
                 div.className = 'change-item change-disappeared';
-                div.innerHTML = `<strong>−</strong> ${c.source_name || c.source_id} <span style="color:var(--text-secondary)">${c.rel_type.replace(/_/g, ' ')}</span> → ${c.target_name || c.target_id}`;
+                const strong = document.createElement('strong');
+                strong.textContent = '−';
+                div.appendChild(strong);
+                div.appendChild(document.createTextNode(` ${c.source_name || c.source_id} `));
+                const span = document.createElement('span');
+                span.style.color = 'var(--text-secondary)';
+                span.textContent = (c.rel_type || '').replace(/_/g, ' ');
+                div.appendChild(span);
+                div.appendChild(document.createTextNode(` → ${c.target_name || c.target_id}`));
                 container.appendChild(div);
             });
 
@@ -680,7 +702,7 @@ class RedThreadApp {
         if (diff.added_nodes.length > 0) {
             html += '<div class="diff-section"><h4>🟢 New Entities</h4>';
             diff.added_nodes.forEach(n => {
-                html += `<div class="diff-item diff-added">${n._label || 'Unknown'}: ${n.name || n.account_number || n.id}</div>`;
+                html += `<div class="diff-item diff-added">${escapeHtml(n._label || 'Unknown')}: ${escapeHtml(n.name || n.account_number || n.id)}</div>`;
             });
             html += '</div>';
         }
@@ -688,7 +710,7 @@ class RedThreadApp {
         if (diff.removed_nodes.length > 0) {
             html += '<div class="diff-section"><h4>🔴 Removed Entities</h4>';
             diff.removed_nodes.forEach(n => {
-                html += `<div class="diff-item diff-removed">${n._label || 'Unknown'}: ${n.name || n.account_number || n.id}</div>`;
+                html += `<div class="diff-item diff-removed">${escapeHtml(n._label || 'Unknown')}: ${escapeHtml(n.name || n.account_number || n.id)}</div>`;
             });
             html += '</div>';
         }
@@ -696,8 +718,8 @@ class RedThreadApp {
         if (diff.modified_nodes.length > 0) {
             html += '<div class="diff-section"><h4>🟡 Modified Entities</h4>';
             diff.modified_nodes.forEach(n => {
-                const changeStr = Object.entries(n.changes).map(([k, v]) => `${k}: ${v.old} → ${v.new}`).join(', ');
-                html += `<div class="diff-item diff-modified">${n.label}: ${n.name} — ${changeStr}</div>`;
+                const changeStr = Object.entries(n.changes).map(([k, v]) => `${escapeHtml(k)}: ${escapeHtml(v.old)} → ${escapeHtml(v.new)}`).join(', ');
+                html += `<div class="diff-item diff-modified">${escapeHtml(n.label)}: ${escapeHtml(n.name)} — ${changeStr}</div>`;
             });
             html += '</div>';
         }
@@ -705,7 +727,7 @@ class RedThreadApp {
         if (diff.added_relationships.length > 0) {
             html += '<div class="diff-section"><h4>🟢 New Relationships</h4>';
             diff.added_relationships.forEach(r => {
-                html += `<div class="diff-item diff-added">${r.source_id} → ${r.rel_type.replace(/_/g, ' ')} → ${r.target_id}</div>`;
+                html += `<div class="diff-item diff-added">${escapeHtml(r.source_id)} → ${escapeHtml((r.rel_type || '').replace(/_/g, ' '))} → ${escapeHtml(r.target_id)}</div>`;
             });
             html += '</div>';
         }
@@ -713,7 +735,7 @@ class RedThreadApp {
         if (diff.removed_relationships.length > 0) {
             html += '<div class="diff-section"><h4>🔴 Removed Relationships</h4>';
             diff.removed_relationships.forEach(r => {
-                html += `<div class="diff-item diff-removed">${r.source_id} → ${r.rel_type.replace(/_/g, ' ')} → ${r.target_id}</div>`;
+                html += `<div class="diff-item diff-removed">${escapeHtml(r.source_id)} → ${escapeHtml((r.rel_type || '').replace(/_/g, ' '))} → ${escapeHtml(r.target_id)}</div>`;
             });
             html += '</div>';
         }
@@ -799,10 +821,15 @@ class RedThreadApp {
                 data.results.slice(0, 50).forEach(row => {
                     const div = document.createElement('div');
                     div.className = 'nlq-result-row';
-                    div.innerHTML = Object.entries(row).map(([key, val]) => {
-                        const display = typeof val === 'object' ? JSON.stringify(val, null, 1) : val;
-                        return `<span class="key">${key}:</span> ${display}`;
-                    }).join('<br>');
+                    Object.entries(row).forEach(([key, val], i) => {
+                        if (i > 0) div.appendChild(document.createElement('br'));
+                        const keySpan = document.createElement('span');
+                        keySpan.className = 'key';
+                        keySpan.textContent = key + ':';
+                        div.appendChild(keySpan);
+                        const display = typeof val === 'object' ? JSON.stringify(val, null, 1) : String(val);
+                        div.appendChild(document.createTextNode(' ' + display));
+                    });
                     contentEl.appendChild(div);
                 });
                 toast(`${data.count} results found`, 'success');

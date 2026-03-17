@@ -246,3 +246,22 @@ class TestNLQ:
         assert len(rows) == 2
         assert rows[0]["name"] == "Alice"
         assert rows[0]["count"] == 5
+
+    def test_enforce_limit_appends_when_missing(self):
+        """Missing LIMIT gets appended."""
+        q = "MATCH (n:Person) RETURN n"
+        result = nlq._enforce_limit(q, max_limit=100)
+        assert "LIMIT 100" in result
+
+    def test_enforce_limit_caps_excessive(self):
+        """Excessive LIMIT is capped."""
+        q = "MATCH (n:Person) RETURN n LIMIT 5000"
+        result = nlq._enforce_limit(q, max_limit=100)
+        assert "LIMIT 100" in result
+        assert "5000" not in result
+
+    def test_enforce_limit_preserves_small(self):
+        """Small LIMIT is preserved."""
+        q = "MATCH (n:Person) RETURN n LIMIT 10"
+        result = nlq._enforce_limit(q, max_limit=100)
+        assert "LIMIT 10" in result

@@ -100,6 +100,9 @@ def translate_to_cypher(question: str) -> dict[str, Any]:
                 "safe": False,
             }
 
+        # Enforce a LIMIT to prevent unbounded queries from the LLM
+        raw_query = _enforce_limit(raw_query, max_limit=100)
+
         return {
             "query": raw_query,
             "question": question,
@@ -187,6 +190,20 @@ def _is_write_query(query: str) -> bool:
                     continue
             return True
     return False
+
+
+def _enforce_limit(query: str, max_limit: int = 100) -> str:
+    """Ensure the query has a LIMIT clause and cap it at max_limit."""
+    upper = query.upper().strip()
+    limit_match = re.search(r"\bLIMIT\s+(\d+)", upper)
+    if limit_match:
+        existing = int(limit_match.group(1))
+        if existing > max_limit:
+            # Replace with capped value
+            return re.sub(r"(?i)\bLIMIT\s+\d+", f"LIMIT {max_limit}", query)
+        return query
+    # No LIMIT found — append one
+    return query.rstrip().rstrip(";") + f" LIMIT {max_limit}"
 
 
 def _format_result(result: Any) -> list[dict[str, Any]]:

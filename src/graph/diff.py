@@ -13,6 +13,11 @@ from src.database.sqlite_client import SQLiteClient
 logger = structlog.get_logger(__name__)
 
 
+def _node_display_name(node: dict) -> str:
+    """Consistent display name for a node in diff output."""
+    return node.get("name") or node.get("account_number") or node.get("id", "unknown")
+
+
 def snapshot_current_graph(
     client: FalkorDBClient,
     sqlite: SQLiteClient,
@@ -172,9 +177,7 @@ def diff_snapshots(
                 modified_nodes.append(
                     {
                         "id": nid,
-                        "name": nodes_b[nid].get("name")
-                        or nodes_b[nid].get("account_number")
-                        or nid,
+                        "name": _node_display_name(nodes_b[nid]),
                         "label": nodes_b[nid].get("_label", "Unknown"),
                         "changes": changes,
                     }
@@ -298,7 +301,7 @@ def diff_current_vs_snapshot(
                 modified_nodes.append(
                     {
                         "id": nid,
-                        "name": nodes_b[nid].get("name") or nid,
+                        "name": _node_display_name(nodes_b[nid]),
                         "label": nodes_b[nid].get("_label", "Unknown"),
                         "changes": changes,
                     }

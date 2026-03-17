@@ -82,28 +82,28 @@ const API = {
 
     // Temporal
     graphAtTime: (date, entityId = null) => {
-        let url = `/api/temporal/graph-at?date=${date}`;
-        if (entityId) url += `&entity_id=${entityId}`;
+        let url = `/api/temporal/graph-at?date=${encodeURIComponent(date)}`;
+        if (entityId) url += `&entity_id=${encodeURIComponent(entityId)}`;
         return API.get(url);
     },
     temporalChanges: (start, end) =>
-        API.get(`/api/temporal/changes?start=${start}&end=${end}`),
+        API.get(`/api/temporal/changes?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`),
     temporalTimeline: () => API.get('/api/temporal/timeline'),
     temporalDateRange: () => API.get('/api/temporal/date-range'),
-    entityTemporalProfile: (id) => API.get(`/api/temporal/entity/${id}`),
+    entityTemporalProfile: (id) => API.get(`/api/temporal/entity/${encodeURIComponent(id)}`),
 
     // Snapshots & Diff
     createSnapshot: (investigationId, name) =>
         API.post(`/api/snapshots/?investigation_id=${encodeURIComponent(investigationId)}&name=${encodeURIComponent(name)}`, {}),
     listSnapshots: (investigationId = null) => {
         let url = '/api/snapshots/';
-        if (investigationId) url += `?investigation_id=${investigationId}`;
+        if (investigationId) url += `?investigation_id=${encodeURIComponent(investigationId)}`;
         return API.get(url);
     },
     diffSnapshots: (a, b) =>
-        API.get(`/api/snapshots/diff/compare?snapshot_a=${a}&snapshot_b=${b}`),
+        API.get(`/api/snapshots/diff/compare?snapshot_a=${encodeURIComponent(a)}&snapshot_b=${encodeURIComponent(b)}`),
     diffCurrent: (snapshotId) =>
-        API.get(`/api/snapshots/diff/current?snapshot_id=${snapshotId}`),
+        API.get(`/api/snapshots/diff/current?snapshot_id=${encodeURIComponent(snapshotId)}`),
 
     // Natural Language Query
     nlQuery: (question) => API.post('/api/nlq/query', { question }),

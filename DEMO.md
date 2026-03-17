@@ -125,27 +125,25 @@ curl "http://localhost:8000/api/temporal/graph-at?date=2016-06-15"
 # See what changed between 2016 and 2019 (core laundering period)
 curl "http://localhost:8000/api/temporal/changes?start=2016-01-01&end=2019-01-01"
 
-# Get Kovacs's relationship timeline
-curl "http://localhost:8000/api/temporal/timeline/p-kovacs"
+# Get all dated relationships in chronological order
+curl "http://localhost:8000/api/temporal/timeline"
 
-# Get Kovacs's temporal profile at a specific date
-curl "http://localhost:8000/api/temporal/entity/p-kovacs?date=2018-06-01"
+# Get Kovacs's temporal profile
+curl "http://localhost:8000/api/temporal/entity/p-kovacs"
 
 # --- Snapshots & Diff ---
 
 # Create a snapshot of the current graph
-curl -X POST "http://localhost:8000/api/snapshots/" \
-  -H "Content-Type: application/json" \
-  -d '{"name": "Full Network", "description": "Complete graph before filtering"}'
+curl -X POST "http://localhost:8000/api/snapshots/?investigation_id=inv-demo&name=Full%20Network"
 
 # List all snapshots
 curl "http://localhost:8000/api/snapshots/"
 
 # Diff two snapshots (replace with actual snapshot IDs)
-curl "http://localhost:8000/api/snapshots/diff/1/2"
+curl "http://localhost:8000/api/snapshots/diff/compare?snapshot_a=SNAP_ID_1&snapshot_b=SNAP_ID_2"
 
 # Diff current graph vs a snapshot
-curl "http://localhost:8000/api/snapshots/diff/current?snapshot_id=1"
+curl "http://localhost:8000/api/snapshots/diff/current?snapshot_id=SNAP_ID_1"
 
 # --- Natural Language Query (requires LLM_API_KEY) ---
 
@@ -157,8 +155,10 @@ curl -X POST "http://localhost:8000/api/nlq/query" \
 # Get example queries
 curl "http://localhost:8000/api/nlq/examples"
 
-# Get the graph schema used for NL→Cypher translation
-curl "http://localhost:8000/api/nlq/schema"
+# Translate to Cypher without executing
+curl -X POST "http://localhost:8000/api/nlq/translate" \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Who directs organizations in the BVI?"}'
 ```
 
 ## Seed Data Summary
