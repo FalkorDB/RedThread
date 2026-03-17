@@ -87,7 +87,7 @@ class TestComputeEntityRisk:
         assert len(connected_ids) == len(set(connected_ids))
 
     def test_propagated_risk_graceful_fallback(self, clean_graph):
-        """Propagation query failure is handled gracefully (logged warning, risk=0)."""
+        """Propagation finds connected high-risk entities via directed traversals."""
         from src.graph.queries import create_entity, create_relationship
         from src.graph.risk_scoring import compute_entity_risk
 
@@ -110,11 +110,13 @@ class TestComputeEntityRisk:
             clean_graph, "Person", "prop-p1", "Organization", "prop-o1", "DIRECTS", {}
         )
 
-        # FalkorDB doesn't support undirected shortestPath, so propagation
-        # falls back to 0 with a logged warning — verify it doesn't crash
+        # Directed traversal should find Shady Co at 1 hop → propagated = 90/2 = 45
         risk = compute_entity_risk(clean_graph, "prop-p1", depth=2)
-        assert risk["propagated_risk"] == 0.0
+        assert risk["propagated_risk"] > 0
         assert risk["entity_id"] == "prop-p1"
+        # Should have a "connected_risk" factor for Shady Co
+        factor_types = [f["factor"] for f in risk["factors"]]
+        assert "connected_risk" in factor_types
 
     def test_high_transaction_volume_risk(self, clean_graph):
         """More than 10 outgoing transfers triggers high_transaction_volume factor."""
