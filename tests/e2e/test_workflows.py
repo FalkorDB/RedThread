@@ -167,3 +167,108 @@ class TestDataImportWorkflow:
         shared = shared_res.json()
         # Both connect to import-o1
         assert len(shared) >= 1
+
+
+class TestCSVImportTemporalWorkflow:
+    """E2E: CSV import → temporal analysis → investigation snapshot."""
+
+    def test_csv_import_temporal_snapshot(self, test_client):
+        """Import entities/rels via CSV, run temporal queries, create investigation snapshot."""
+        import csv
+        import io
+
+        # Step 1: Import entities via CSV (label as query param)
+        entity_buf = io.StringIO()
+        writer = csv.writer(entity_buf)
+        writer.writerow(["id", "name", "institution", "account_number"])
+        writer.writerow(["e2e-csv-a1", "Account Alpha", "Big Bank", "CSV-001"])
+        writer.writerow(["e2e-csv-a2", "Account Beta", "Small Bank", "CSV-002"])
+        writer.writerow(["e2e-csv-a3", "Account Gamma", "Micro Bank", "CSV-003"])
+        entity_csv = entity_buf.getvalue()
+
+        res = test_client.post(
+            "/api/import/csv/entities?label=Account",
+            files={"file": ("entities.csv", entity_csv, "text/csv")},
+        )
+        assert res.status_code == 200
+        assert res.json()["imported"] == 3
+
+        # Step 2: Import relationships via CSV (rel_type as query param)
+        # Include valid_from so temporal queries can find these relationships
+        rel_buf = io.StringIO()
+        writer = csv.writer(rel_buf)
+        writer.writerow(
+            [
+                "source_label",
+                "source_id",
+                "target_label",
+                "target_id",
+                "amount",
+                "date",
+                "valid_from",
+            ]
+        )
+        writer.writerow(
+            ["Account", "e2e-csv-a1", "Account", "e2e-csv-a2", "100000", "2024-03-01", "2024-03-01"]
+        )
+        writer.writerow(
+            ["Account", "e2e-csv-a2", "Account", "e2e-csv-a3", "95000", "2024-03-05", "2024-03-05"]
+        )
+        writer.writerow(
+            ["Account", "e2e-csv-a3", "Account", "e2e-csv-a1", "90000", "2024-03-10", "2024-03-10"]
+        )
+        rel_csv = rel_buf.getvalue()
+
+        res = test_client.post(
+            "/api/import/csv/relationships?rel_type=TRANSFERRED_TO",
+            files={"file": ("rels.csv", rel_csv, "text/csv")},
+        )
+        assert res.status_code == 200
+        assert res.json()["imported"] == 3
+
+        # Step 3: Temporal queries — date range should include March 2024
+        range_res = test_client.get("/api/temporal/date-range")
+        assert range_res.status_code == 200
+
+        # Step 4: Temporal timeline should include our transfers
+        timeline_res = test_client.get("/api/temporal/timeline")
+        assert timeline_res.status_code == 200
+        assert len(timeline_res.json()) >= 3
+
+        # Step 5: Changes in date range
+        changes = test_client.get(
+            "/api/temporal/changes", params={"start": "2024-03-01", "end": "2024-03-15"}
+        )
+        assert changes.status_code == 200
+
+        # Step 6: Verify entities were created by fetching one
+        acct_res = test_client.get("/api/entities/?q=e2e-csv-a1")
+        assert acct_res.status_code == 200
+
+        # Step 7: Create investigation and take snapshot
+        inv = test_client.post(
+            "/api/investigations/",
+            json={"name": "CSV Import Investigation", "description": "Testing CSV workflow"},
+        ).json()
+
+        test_client.post(
+            f"/api/investigations/{inv['id']}/entities?entity_id=e2e-csv-a1&entity_label=Account"
+        )
+        test_client.post(
+            f"/api/investigations/{inv['id']}/entities?entity_id=e2e-csv-a2&entity_label=Account"
+        )
+
+        snap = test_client.post(
+            f"/api/investigations/{inv['id']}/snapshots",
+            json={
+                "name": "Initial snapshot",
+                "graph_state": '{"nodes": 3, "edges": 3}',
+                "viewport": '{"zoom": 1.0}',
+            },
+        )
+        assert snap.status_code == 200
+        assert snap.json()["name"] == "Initial snapshot"
+
+        # Step 8: Verify investigation lists the entities
+        inv_detail = test_client.get(f"/api/investigations/{inv['id']}").json()
+        assert len(inv_detail.get("entities", [])) >= 2
