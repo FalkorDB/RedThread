@@ -214,7 +214,78 @@ class TestRelationshipDataValidation:
         assert any("share_pct" in e for e in errors)
 
 
-class TestEntityTemporalValidation:
+class TestRelationshipLabelPairValidation:
+    """Ensure only allowed source→target label pairs are accepted for each rel type."""
+
+    _base = {"source_id": "s1", "target_id": "t1"}
+
+    def test_valid_directs_pair(self):
+        data = {**self._base, "source_label": "Person", "target_label": "Organization"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_invalid_directs_pair_account_to_person(self):
+        data = {**self._base, "source_label": "Account", "target_label": "Person"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("Invalid label pair" in e for e in errors)
+
+    def test_valid_transferred_to_pair(self):
+        data = {**self._base, "source_label": "Account", "target_label": "Account"}
+        errors = validate_relationship_data("TRANSFERRED_TO", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_invalid_transferred_to_pair_person_to_account(self):
+        data = {**self._base, "source_label": "Person", "target_label": "Account"}
+        errors = validate_relationship_data("TRANSFERRED_TO", data)
+        assert any("Invalid label pair" in e for e in errors)
+
+    def test_valid_owns_person_to_account(self):
+        data = {**self._base, "source_label": "Person", "target_label": "Account"}
+        errors = validate_relationship_data("OWNS", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_valid_owns_org_to_property(self):
+        data = {**self._base, "source_label": "Organization", "target_label": "Property"}
+        errors = validate_relationship_data("OWNS", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_invalid_owns_event_to_account(self):
+        data = {**self._base, "source_label": "Event", "target_label": "Account"}
+        errors = validate_relationship_data("OWNS", data)
+        assert any("Invalid label pair" in e for e in errors)
+
+    def test_valid_associated_with_any_pair(self):
+        """ASSOCIATED_WITH allows any valid label pair."""
+        data = {**self._base, "source_label": "Document", "target_label": "Event"}
+        errors = validate_relationship_data("ASSOCIATED_WITH", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_valid_mentioned_in_person_to_document(self):
+        data = {**self._base, "source_label": "Person", "target_label": "Document"}
+        errors = validate_relationship_data("MENTIONED_IN", data)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_invalid_mentioned_in_person_to_person(self):
+        data = {**self._base, "source_label": "Person", "target_label": "Person"}
+        errors = validate_relationship_data("MENTIONED_IN", data)
+        assert any("Invalid label pair" in e for e in errors)
+
+    def test_invalid_label_skips_pair_check(self):
+        """When source_label is invalid, pair check is skipped (label error already added)."""
+        data = {**self._base, "source_label": "Bogus", "target_label": "Account"}
+        errors = validate_relationship_data("OWNS", data)
+        assert any("Invalid source_label" in e for e in errors)
+        assert not any("Invalid label pair" in e for e in errors)
+
+    def test_error_message_includes_types(self):
+        data = {**self._base, "source_label": "Address", "target_label": "Person"}
+        errors = validate_relationship_data("DIRECTS", data)
+        pair_errors = [e for e in errors if "Invalid label pair" in e]
+        assert len(pair_errors) == 1
+        assert "DIRECTS" in pair_errors[0]
+        assert "Address" in pair_errors[0]
+        assert "Person" in pair_errors[0]
+
     """Ensure since <= until for entities."""
 
     def test_since_before_until_accepted(self):

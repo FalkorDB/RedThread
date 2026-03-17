@@ -5,6 +5,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from src.models.relationships import RELATIONSHIP_RULES
+
 VALID_LABELS = {"Person", "Organization", "Account", "Property", "Event", "Document", "Address"}
 
 VALID_REL_TYPES = {
@@ -114,6 +116,18 @@ def validate_relationship_data(rel_type: str, data: dict[str, Any]) -> list[str]
         errors.append(f"Invalid source_label: {data['source_label']}")
     if data.get("target_label") and data["target_label"] not in VALID_LABELS:
         errors.append(f"Invalid target_label: {data['target_label']}")
+
+    # Label-pair compatibility check
+    src_label = data.get("source_label", "")
+    tgt_label = data.get("target_label", "")
+    if rel_type in RELATIONSHIP_RULES and src_label in VALID_LABELS and tgt_label in VALID_LABELS:
+        allowed = False
+        for valid_sources, valid_targets in RELATIONSHIP_RULES[rel_type]:
+            if src_label in valid_sources and tgt_label in valid_targets:
+                allowed = True
+                break
+        if not allowed:
+            errors.append(f"Invalid label pair for {rel_type}: {src_label} -> {tgt_label}")
 
     # Amount validation for TRANSFERRED_TO
     if rel_type == "TRANSFERRED_TO":
