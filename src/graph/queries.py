@@ -234,11 +234,16 @@ def delete_relationship(
     rel_type: str,
 ) -> bool:
     """Delete a specific relationship."""
-    query = (
-        f"MATCH (a {{id: $src_id}})-[r:{rel_type}]->(b {{id: $tgt_id}}) DELETE r RETURN count(r)"
-    )
+    query = f"MATCH (a {{id: $src_id}})-[r:{rel_type}]->(b {{id: $tgt_id}}) DELETE r"
     result = client.query(query, params={"src_id": source_id, "tgt_id": target_id})
-    return bool(result.result_set)
+    deleted = (
+        result.relationships_deleted > 0 if hasattr(result, "relationships_deleted") else False
+    )
+    if deleted:
+        logger.info(
+            "relationship_deleted", source_id=source_id, target_id=target_id, rel_type=rel_type
+        )
+    return deleted
 
 
 def get_neighborhood(
