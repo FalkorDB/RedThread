@@ -1,10 +1,14 @@
-.PHONY: install dev test lint run seed clean docker-up docker-down benchmark
+.PHONY: install dev test lint run seed clean docker-up docker-down benchmark setup
 
 install:
 	pip install -r requirements.txt
 
 dev:
 	pip install -r requirements-dev.txt
+	pre-commit install
+
+setup: dev
+	@echo "Pre-commit hooks installed. Run 'make test' to verify."
 
 test:
 	python -m pytest tests/ -v --tb=short
