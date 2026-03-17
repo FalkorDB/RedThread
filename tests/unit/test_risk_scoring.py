@@ -82,9 +82,7 @@ class TestComputeEntityRisk:
         from src.graph.risk_scoring import compute_entity_risk
 
         risk = compute_entity_risk(seeded_graph, "test-o1", depth=3)
-        connected_ids = [
-            f["detail"] for f in risk["factors"] if f["factor"] == "connected_risk"
-        ]
+        connected_ids = [f["detail"] for f in risk["factors"] if f["factor"] == "connected_risk"]
         # No two connected_risk factors should reference the same entity
         assert len(connected_ids) == len(set(connected_ids))
 
