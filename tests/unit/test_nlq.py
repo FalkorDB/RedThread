@@ -9,6 +9,8 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from src.graph.nlq import (
     _enforce_limit,
     _format_result,
@@ -169,6 +171,15 @@ class TestFormatResult:
 # ── translate_to_cypher ─────────────────────────────────────────────
 
 
+try:
+    import openai  # noqa: F401
+
+    _has_openai = True
+except ImportError:
+    _has_openai = False
+
+
+@pytest.mark.skipif(not _has_openai, reason="openai package not installed")
 class TestTranslateToCypher:
     """Test translate_to_cypher with mocked LLM."""
 
