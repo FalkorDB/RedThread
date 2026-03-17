@@ -24,6 +24,7 @@ services:
       - APP_DEBUG=false
       - APP_LOG_LEVEL=info
       - SQLITE_DB_PATH=/app/data/redthread.db
+      - SEED_DATA=${SEED_DATA:-true}
     volumes:
       - app_data:/app/data
     depends_on:

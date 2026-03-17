@@ -95,10 +95,11 @@ Type questions in plain English — e.g. *"show me all money flows from Kovacs t
 git clone https://github.com/FalkorDB/RedThread.git
 cd RedThread
 docker compose up -d
-# Seed with demo data:
-docker compose exec app python -m src.seed
+# Demo data is loaded automatically on first launch!
 # Open http://localhost:8000
 ```
+
+> **Tip:** To skip auto-seeding, run `SEED_DATA=false docker compose up -d`. To re-seed, delete the marker: `docker compose exec app rm /app/data/.seeded && docker compose restart app`.
 
 ### Option 2: Local Development
 
