@@ -90,6 +90,25 @@ class TestGraphSnapshot:
         res = test_client.get("/api/export/graph-snapshot?limit=5")
         assert res.status_code == 200
 
+    def test_snapshot_does_not_mutate_cached_entities(self, test_client, clean_graph):
+        """Regression: export must not pop 'label' from entity dicts."""
+        test_client.post("/api/entities/person", json={"name": "Immutable"})
+
+        # Call snapshot twice — if the first call mutates, second will differ
+        res1 = test_client.get("/api/export/graph-snapshot")
+        res2 = test_client.get("/api/export/graph-snapshot")
+        assert res1.status_code == 200
+        assert res2.status_code == 200
+
+        # Both should have entities with label and properties
+        for ent in res1.json()["entities"]:
+            assert "label" in ent
+            assert "properties" in ent
+
+        for ent in res2.json()["entities"]:
+            assert "label" in ent
+            assert "properties" in ent
+
 
 class TestNLQWriteQueryDetection:
     """Test the NLQ safety check — write query detection."""

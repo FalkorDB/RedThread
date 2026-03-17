@@ -100,8 +100,10 @@ def full_graph_snapshot(
     for label in ENTITY_LABELS:
         ents = queries.list_entities(db, label, skip=0, limit=limit)
         for e in ents:
-            lbl = e.pop("label", label)
-            all_entities.append({"label": lbl, "properties": e})
+            # Copy to avoid mutating the original dict
+            props = {k: v for k, v in e.items() if k != "label"}
+            lbl = e.get("label", label)
+            all_entities.append({"label": lbl, "properties": props})
 
     return {
         "exported_at": datetime.now(UTC).isoformat(),
