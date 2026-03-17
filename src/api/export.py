@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from src.database.falkordb_client import db
 from src.graph import analytics, queries
@@ -20,12 +20,18 @@ def export_subgraph(
     limit: int = Query(100, ge=1, le=500),
 ) -> dict[str, Any]:
     """Export a subgraph around an entity as JSON (compatible with import format)."""
+    entity = queries.get_entity_any_label(db, entity_id)
+    if not entity:
+        raise HTTPException(404, f"Entity not found: {entity_id}")
+
     neighborhood = queries.get_neighborhood(db, entity_id, depth=depth, limit=limit)
 
     entities = []
     for node in neighborhood.get("nodes", []):
-        label = node.pop("label", "Unknown")
-        entities.append({"label": label, "properties": node})
+        # Copy to avoid mutating the original dict
+        props = {k: v for k, v in node.items() if k != "label"}
+        label = node.get("label", "Unknown")
+        entities.append({"label": label, "properties": props})
 
     relationships = []
     for edge in neighborhood.get("edges", []):
@@ -56,7 +62,7 @@ def generate_report(
     """Generate an investigation report for an entity."""
     entity = queries.get_entity_any_label(db, entity_id)
     if not entity:
-        return {"error": "Entity not found"}
+        raise HTTPException(404, f"Entity not found: {entity_id}")
 
     rels = queries.get_entity_relationships(db, entity_id)
     neighborhood = queries.get_neighborhood(db, entity_id, depth=2, limit=100)
