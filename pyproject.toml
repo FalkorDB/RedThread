@@ -1,0 +1,18 @@
+[project]
+name = "redthread"
+version = "0.1.0"
+description = "Graph-powered financial investigation platform"
+requires-python = ">=3.11"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "SIM"]
+ignore = ["B008", "E501", "SIM105", "SIM108", "SIM102", "E402", "B017"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = ["ignore::DeprecationWarning"]

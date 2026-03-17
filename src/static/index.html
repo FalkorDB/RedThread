@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RedThread — Financial Investigation Platform</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script type="text/javascript" src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+    <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+<div id="app">
+    <!-- Top Bar -->
+    <header id="topbar">
+        <div class="logo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
+            </svg>
+            RedThread
+        </div>
+
+        <div id="search-box">
+            <span id="search-icon">🔍</span>
+            <input id="search-input" type="text" placeholder="Search entities (persons, organizations, accounts...)" autocomplete="off">
+            <div id="search-results"></div>
+        </div>
+
+        <div class="topbar-stats">
+            <span><strong id="stat-nodes">0</strong> nodes</span>
+            <span><strong id="stat-rels">0</strong> relationships</span>
+        </div>
+
+        <button class="topbar-btn" onclick="app.startPathfind()" title="Find path between two nodes">🔗 Path Find</button>
+        <button class="topbar-btn" id="btn-patterns" title="Run pattern detection">🔍 Patterns</button>
+        <button class="topbar-btn" id="btn-analyze" title="Analysis tools">📊 Analyze</button>
+    </header>
+
+    <!-- Sidebar -->
+    <aside id="sidebar">
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="tab-entities">Entities</button>
+            <button class="tab-btn" data-tab="tab-tools">Tools</button>
+        </div>
+
+        <div id="tab-entities" class="tab-content active">
+            <div class="sidebar-section">
+                <h3>👤 Persons</h3>
+                <ul class="entity-list" id="list-person"></ul>
+            </div>
+            <div class="sidebar-section">
+                <h3>🏢 Organizations</h3>
+                <ul class="entity-list" id="list-organization"></ul>
+            </div>
+            <div class="sidebar-section">
+                <h3>💳 Accounts</h3>
+                <ul class="entity-list" id="list-account"></ul>
+            </div>
+        </div>
+
+        <div id="tab-tools" class="tab-content">
+            <div class="sidebar-section">
+                <h3>Investigation Tools</h3>
+                <div class="analysis-tool" onclick="app.startPathfind()">
+                    <h4>🔗 Find Paths</h4>
+                    <p>Discover connections between two entities</p>
+                </div>
+                <div class="analysis-tool" onclick="app.runMoneyFlow()">
+                    <h4>💰 Trace Money Flow</h4>
+                    <p>Follow the money from an account</p>
+                </div>
+                <div class="analysis-tool" onclick="app.computeRisk()">
+                    <h4>⚠️ Compute Risk</h4>
+                    <p>Calculate risk score for selected entity</p>
+                </div>
+                <div class="analysis-tool" onclick="app.showHighestRisk()">
+                    <h4>🔥 Highest Risk</h4>
+                    <p>View entities with highest risk scores</p>
+                </div>
+                <div class="analysis-tool" onclick="app.showCentrality()">
+                    <h4>🎯 Most Connected</h4>
+                    <p>Find the most connected entities</p>
+                </div>
+                <div class="analysis-tool" onclick="app.exportReport()">
+                    <h4>📄 Export Report</h4>
+                    <p>Generate JSON report for selected entity</p>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Graph Canvas -->
+    <main id="graph-container">
+        <div id="graph-canvas"></div>
+
+        <div id="graph-toolbar">
+            <button id="btn-fit" title="Fit to view">⊞</button>
+            <button id="btn-clear" title="Clear graph">✕</button>
+        </div>
+
+        <div id="graph-legend">
+            <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>Person</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>Organization</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#22c55e"></div>Account</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>Property</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#ef4444"></div>Event</div>
+            <div class="legend-item"><div class="legend-dot" style="background:#06b6d4"></div>Document</div>
+        </div>
+
+        <!-- Analysis Results Panel -->
+        <div id="analysis-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:14px;font-weight:600">Analysis</span>
+                <button class="detail-close" onclick="document.getElementById('analysis-panel').classList.remove('open')">✕</button>
+            </div>
+            <div id="analysis-content">
+                <p style="color:var(--text-secondary);font-size:12px">Run an analysis tool to see results here.</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Detail Panel -->
+    <aside id="detail-panel">
+        <div class="detail-header">
+            <div style="display:flex;align-items:center;gap:8px">
+                <span class="entity-badge badge-person">P</span>
+                <h2>Entity Name</h2>
+            </div>
+            <button class="detail-close" onclick="app.closeDetail()">✕</button>
+        </div>
+        <div class="detail-body">
+            <div class="detail-section">
+                <h4>Properties</h4>
+                <div class="prop-grid" id="detail-props"></div>
+            </div>
+            <div class="detail-section">
+                <h4>Actions</h4>
+                <div style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px">
+                    <button class="btn btn-primary" onclick="app.findPathBetween()" style="font-size:11px;padding:4px 8px">🔗 Find Paths From</button>
+                    <button class="btn btn-secondary" onclick="app.runMoneyFlow()" style="font-size:11px;padding:4px 8px">💰 Money Flow</button>
+                    <button class="btn btn-secondary" onclick="app.computeRisk()" style="font-size:11px;padding:4px 8px">⚠️ Risk</button>
+                    <button class="btn btn-secondary" onclick="app.exportReport()" style="font-size:11px;padding:4px 8px">📄 Report</button>
+                </div>
+            </div>
+            <div class="detail-section">
+                <h4>Relationships</h4>
+                <div id="detail-rels"><div class="spinner"></div></div>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<div id="toast-container"></div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/graph.js"></script>
+<script src="/static/js/app.js"></script>
+</body>
+</html>
