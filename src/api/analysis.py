@@ -223,3 +223,15 @@ def entity_timeline(
 def graph_stats() -> dict[str, Any]:
     """Get graph summary statistics."""
     return analytics.graph_summary(db)
+
+
+@router.get("/validate")
+def validate_graph_data() -> dict[str, Any]:
+    """Run data-quality checks on the graph.
+
+    Detects orphaned nodes, missing names, duplicate IDs, and
+    self-referencing relationships.
+    """
+    from src.graph.validation import validate_graph
+
+    return validate_graph(db)
