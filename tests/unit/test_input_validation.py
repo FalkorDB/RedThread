@@ -381,3 +381,69 @@ class TestRelationshipTemporalValidation:
         data = {**self._base, "since": "not-a-date"}
         errors = validate_relationship_data("DIRECTS", data)
         assert any("since" in e and "YYYY-MM-DD" in e for e in errors)
+
+
+# ---------------------------------------------------------------------------
+# Numeric field edge cases (value, amount)
+# ---------------------------------------------------------------------------
+
+
+class TestNumericFieldValidation:
+    """Test value and amount numeric validation in entity data."""
+
+    def test_non_numeric_value_rejected(self):
+        errors = validate_entity_data(
+            "Property", {"property_type": "real_estate", "value": "not-a-number"}
+        )
+        assert any("value must be a number" in e for e in errors)
+
+    def test_numeric_string_value_accepted(self):
+        errors = validate_entity_data(
+            "Property", {"property_type": "real_estate", "value": "12345.50"}
+        )
+        assert not any("value must be a number" in e for e in errors)
+
+    def test_zero_value_accepted(self):
+        errors = validate_entity_data("Property", {"property_type": "real_estate", "value": 0})
+        assert not any("value must be a number" in e for e in errors)
+
+    def test_non_numeric_amount_rejected(self):
+        errors = validate_entity_data("Event", {"event_type": "transaction", "amount": "abc"})
+        assert any("amount must be a number" in e for e in errors)
+
+    def test_numeric_string_amount_accepted(self):
+        errors = validate_entity_data("Event", {"event_type": "transaction", "amount": "500.00"})
+        assert not any("amount must be a number" in e for e in errors)
+
+    def test_zero_amount_accepted(self):
+        errors = validate_entity_data("Event", {"event_type": "transaction", "amount": 0})
+        assert not any("amount must be a number" in e for e in errors)
+
+    def test_empty_string_value_skipped(self):
+        """Empty string value is falsy, so the check is skipped."""
+        errors = validate_entity_data("Property", {"property_type": "real_estate", "value": ""})
+        assert not any("value must be a number" in e for e in errors)
+
+    def test_empty_string_amount_skipped(self):
+        """Empty string amount is falsy, so the check is skipped."""
+        errors = validate_entity_data("Event", {"event_type": "transaction", "amount": ""})
+        assert not any("amount must be a number" in e for e in errors)
+
+
+class TestValidationErrorClass:
+    """Test the ValidationError exception class."""
+
+    def test_validation_error_stores_errors(self):
+        from src.ingestion.validators import ValidationError
+
+        err = ValidationError(["field1 missing", "field2 invalid"])
+        assert err.errors == ["field1 missing", "field2 invalid"]
+        assert "field1 missing" in str(err)
+        assert "field2 invalid" in str(err)
+
+    def test_validation_error_single(self):
+        from src.ingestion.validators import ValidationError
+
+        err = ValidationError(["only one error"])
+        assert len(err.errors) == 1
+        assert "only one error" in str(err)
