@@ -98,3 +98,28 @@ class TestQueryCRUD:
         result = get_entity_any_label(clean_graph, "any-a1")
         assert result is not None
         assert result["account_number"] == "TEST-001"
+
+    def test_delete_relationship(self, clean_graph):
+        from src.graph.queries import (
+            create_entity,
+            create_relationship,
+            delete_relationship,
+            get_entity_relationships,
+        )
+
+        create_entity(clean_graph, "Person", {"id": "del-p1", "name": "Src"})
+        create_entity(clean_graph, "Organization", {"id": "del-o1", "name": "Tgt"})
+        create_relationship(
+            clean_graph, "Person", "del-p1", "Organization", "del-o1", "DIRECTS", {}
+        )
+        assert len(get_entity_relationships(clean_graph, "del-p1")) == 1
+
+        deleted = delete_relationship(clean_graph, "del-p1", "del-o1", "DIRECTS")
+        assert deleted is True
+        assert len(get_entity_relationships(clean_graph, "del-p1")) == 0
+
+    def test_delete_relationship_not_found(self, clean_graph):
+        from src.graph.queries import delete_relationship
+
+        deleted = delete_relationship(clean_graph, "no-src", "no-tgt", "DIRECTS")
+        assert deleted is False
