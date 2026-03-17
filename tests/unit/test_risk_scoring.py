@@ -68,6 +68,75 @@ class TestComputeEntityRisk:
         assert risk_d3["risk_score"] >= 0
         assert risk_d1["risk_score"] >= 0
 
+    def test_propagated_risk_graceful_fallback(self, clean_graph):
+        """Propagation query failure is handled gracefully (logged warning, risk=0)."""
+        from src.graph.queries import create_entity, create_relationship
+        from src.graph.risk_scoring import compute_entity_risk
+
+        create_entity(
+            clean_graph,
+            "Person",
+            {"id": "prop-p1", "name": "Innocent", "risk_score": 0.0},
+        )
+        create_entity(
+            clean_graph,
+            "Organization",
+            {
+                "id": "prop-o1",
+                "name": "Shady Co",
+                "jurisdiction": "Panama",
+                "risk_score": 90.0,
+            },
+        )
+        create_relationship(
+            clean_graph, "Person", "prop-p1", "Organization", "prop-o1", "DIRECTS", {}
+        )
+
+        # FalkorDB doesn't support undirected shortestPath, so propagation
+        # falls back to 0 with a logged warning — verify it doesn't crash
+        risk = compute_entity_risk(clean_graph, "prop-p1", depth=2)
+        assert risk["propagated_risk"] == 0.0
+        assert risk["entity_id"] == "prop-p1"
+
+    def test_high_transaction_volume_risk(self, clean_graph):
+        """More than 10 outgoing transfers triggers high_transaction_volume factor."""
+        from src.graph.queries import create_entity, create_relationship
+        from src.graph.risk_scoring import compute_entity_risk
+
+        create_entity(
+            clean_graph,
+            "Person",
+            {"id": "tx-p1", "name": "Tx Person"},
+        )
+        create_entity(
+            clean_graph,
+            "Account",
+            {"id": "tx-src", "account_number": "SRC"},
+        )
+        create_relationship(clean_graph, "Person", "tx-p1", "Account", "tx-src", "OWNS", {})
+
+        # Create 12 destination accounts + transfers
+        for i in range(12):
+            dst_id = f"tx-dst-{i}"
+            create_entity(
+                clean_graph,
+                "Account",
+                {"id": dst_id, "account_number": f"DST-{i}"},
+            )
+            create_relationship(
+                clean_graph,
+                "Account",
+                "tx-src",
+                "Account",
+                dst_id,
+                "TRANSFERRED_TO",
+                {"amount": 5000},
+            )
+
+        risk = compute_entity_risk(clean_graph, "tx-p1", depth=2)
+        factor_types = [f["factor"] for f in risk["factors"]]
+        assert "high_transaction_volume" in factor_types
+
 
 class TestNetworkRisk:
     """Test batch risk computation."""
