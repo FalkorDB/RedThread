@@ -143,8 +143,8 @@ def compute_entity_risk(
                     }
                 )
                 base_risk += tx_risk
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("transaction_pattern_query_failed", entity=entity_id, error=str(e))
 
     total_risk = min(base_risk + propagated_risk, 100.0)
     risk_data = {
@@ -160,8 +160,8 @@ def compute_entity_risk(
     try:
         update_query = "MATCH (n {id: $id}) SET n.risk_score = $risk"
         client.query(update_query, params={"id": entity_id, "risk": round(total_risk, 2)})
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("risk_score_update_failed", entity=entity_id, error=str(e))
 
     logger.info("risk_computed", entity=entity_id, risk=total_risk)
     return risk_data
