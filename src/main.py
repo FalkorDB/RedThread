@@ -12,6 +12,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import ResponseError as RedisResponseError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from src.config import settings
 from src.database.falkordb_client import db
@@ -77,6 +80,30 @@ def shutdown() -> None:
     db.close()
     sqlite_db.close()
     logger.info("redthread_shutdown")
+
+
+@app.exception_handler(RedisResponseError)
+async def redis_response_error_handler(request: Request, exc: RedisResponseError) -> JSONResponse:
+    msg = str(exc)
+    if "timed out" in msg.lower():
+        logger.warning("query_timeout", path=request.url.path, error=msg)
+        return JSONResponse(
+            status_code=504,
+            content={"error": "Query timed out — try reducing depth or scope"},
+        )
+    logger.error("redis_response_error", path=request.url.path, error=msg)
+    return JSONResponse(status_code=502, content={"error": f"Graph query error: {msg}"})
+
+
+@app.exception_handler(RedisConnectionError)
+@app.exception_handler(RedisTimeoutError)
+async def redis_connection_error_handler(
+    request: Request, exc: RedisConnectionError | RedisTimeoutError
+) -> JSONResponse:
+    logger.error("redis_connection_error", path=request.url.path, error=str(exc))
+    return JSONResponse(
+        status_code=503, content={"error": "FalkorDB is unavailable — please try again later"}
+    )
 
 
 @app.exception_handler(Exception)
