@@ -559,3 +559,147 @@ body {
 @keyframes spin {
     to { transform: rotate(360deg); }
 }
+
+/* Timeline Panel */
+#timeline-panel {
+    position: absolute;
+    bottom: 12px;
+    left: 12px;
+    right: 12px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 16px;
+    z-index: 10;
+    display: none;
+}
+
+#timeline-panel.open { display: block; }
+
+#timeline-slider {
+    -webkit-appearance: none;
+    height: 6px;
+    border-radius: 3px;
+    background: var(--bg-tertiary);
+    outline: none;
+}
+
+#timeline-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent);
+    cursor: pointer;
+    border: 2px solid var(--bg-secondary);
+}
+
+#timeline-changes .change-item {
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+#timeline-changes .change-appeared {
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 3px solid var(--success);
+}
+
+#timeline-changes .change-disappeared {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid var(--accent);
+}
+
+/* NL Query Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-overlay.open { display: flex; }
+
+.modal-content {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    width: 90%;
+    max-width: 680px;
+    max-height: 85vh;
+    overflow-y: auto;
+}
+
+.nlq-example {
+    display: inline-block;
+    padding: 3px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    font-size: 11px;
+    margin: 2px;
+    cursor: pointer;
+    transition: background 0.15s;
+    color: var(--text-secondary);
+}
+
+.nlq-example:hover {
+    background: var(--border);
+    color: var(--text-primary);
+}
+
+.nlq-result-row {
+    padding: 6px 8px;
+    background: var(--bg-tertiary);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 12px;
+}
+
+.nlq-result-row .key {
+    color: var(--text-secondary);
+    font-size: 10px;
+    text-transform: uppercase;
+}
+
+/* Diff View */
+.diff-section {
+    margin-bottom: 12px;
+}
+
+.diff-section h4 {
+    font-size: 12px;
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.diff-item {
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+.diff-added {
+    background: rgba(34, 197, 94, 0.1);
+    border-left: 3px solid var(--success);
+}
+
+.diff-removed {
+    background: rgba(239, 68, 68, 0.1);
+    border-left: 3px solid var(--accent);
+}
+
+.diff-modified {
+    background: rgba(245, 158, 11, 0.1);
+    border-left: 3px solid var(--warning);
+}

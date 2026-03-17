@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     # Security
     secret_key: str = "change-me-in-production"
 
+    # LLM (for natural language → Cypher)
+    llm_api_key: str = ""
+    llm_base_url: str = ""
+    llm_model: str = "gpt-4o-mini"
+
     # Query limits
     max_path_depth: int = 8
     max_results: int = 100

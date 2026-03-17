@@ -91,7 +91,10 @@ from src.api.entities import router as entities_router
 from src.api.export import router as export_router
 from src.api.ingestion import router as ingestion_router
 from src.api.investigations import router as investigations_router
+from src.api.nlquery import router as nlquery_router
 from src.api.relationships import router as relationships_router
+from src.api.snapshots import router as snapshots_router
+from src.api.temporal import router as temporal_router
 
 app.include_router(entities_router)
 app.include_router(relationships_router)
@@ -99,6 +102,9 @@ app.include_router(analysis_router)
 app.include_router(investigations_router)
 app.include_router(ingestion_router)
 app.include_router(export_router)
+app.include_router(temporal_router)
+app.include_router(snapshots_router)
+app.include_router(nlquery_router)
 
 
 @app.get("/api/health")

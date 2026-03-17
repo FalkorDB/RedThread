@@ -651,27 +651,53 @@ def seed(client: FalkorDBClient) -> dict:
     # === RELATIONSHIPS ===
     print("\n   Creating relationships...")
 
+    def _add_temporal(props: dict, default_from: str | None = None) -> dict:
+        """Auto-populate valid_from/valid_to from since/until if not set."""
+        if "valid_from" not in props:
+            props["valid_from"] = props.get("since") or props.get("date") or default_from or ""
+        if "valid_to" not in props and "until" in props and props["until"]:
+            props["valid_to"] = props["until"]
+        return props
+
     # Directs (Person → Organization)
     directs = [
-        ("p-kovacs", "o-nova-infra", {"role": "chairman", "since": "2015-01-01"}),
+        (
+            "p-kovacs",
+            "o-nova-infra",
+            {"role": "chairman", "since": "2015-01-01", "until": "2020-03-15"},
+        ),
         ("p-walsh", "o-golden-gate", {"role": "nominee director", "since": "2018-06-01"}),
         ("p-walsh", "o-cerulean", {"role": "nominee trustee", "since": "2018-06-15"}),
-        ("p-walsh", "o-phantom-svcs", {"role": "nominee director", "since": "2018-03-01"}),
+        (
+            "p-walsh",
+            "o-phantom-svcs",
+            {"role": "nominee director", "since": "2018-03-01", "until": "2020-06-01"},
+        ),
         ("p-santos", "o-crimson-prop", {"role": "director", "since": "2017-01-01"}),
         ("p-chen", "o-pacific-rim", {"role": "managing director", "since": "2012-05-01"}),
         ("p-chen", "o-dragon-inv", {"role": "chairman", "since": "2016-03-01"}),
         ("p-okafor", "o-titan-oil", {"role": "CEO", "since": "2010-01-01"}),
-        ("p-ndelu", "o-atlas-mining", {"role": "director", "since": "2014-07-01"}),
+        (
+            "p-ndelu",
+            "o-atlas-mining",
+            {"role": "director", "since": "2014-07-01", "until": "2021-01-01"},
+        ),
         ("p-al-rashid", "o-sea-breeze", {"role": "owner", "since": "2011-01-01"}),
         ("p-rossi", "o-sunset-re", {"role": "managing director", "since": "2016-06-01"}),
         ("p-devries", "o-northwind", {"role": "partner", "since": "2013-01-01"}),
-        ("p-mueller", "o-rhine-bank", {"role": "VP compliance", "since": "2018-01-01"}),
+        (
+            "p-mueller",
+            "o-rhine-bank",
+            {"role": "VP compliance", "since": "2018-01-01", "until": "2020-12-31"},
+        ),
         ("p-garcia", "o-phantom-svcs", {"role": "formation agent", "since": "2018-03-01"}),
         ("p-yamamoto", "o-alpine-wm", {"role": "fund manager", "since": "2019-01-01"}),
     ]
 
     for src, tgt, props in directs:
-        create_relationship(client, "Person", src, "Organization", tgt, "DIRECTS", props)
+        create_relationship(
+            client, "Person", src, "Organization", tgt, "DIRECTS", _add_temporal(props)
+        )
 
     # Owns (ownership chains)
     owns = [
@@ -760,7 +786,7 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, src_label, tgt, tgt_label, props in owns:
-        create_relationship(client, src_label, src, tgt_label, tgt, "OWNS", props)
+        create_relationship(client, src_label, src, tgt_label, tgt, "OWNS", _add_temporal(props))
 
     # Subsidiary chains
     subsidiaries = [
@@ -773,7 +799,7 @@ def seed(client: FalkorDBClient) -> dict:
 
     for src, tgt, props in subsidiaries:
         create_relationship(
-            client, "Organization", src, "Organization", tgt, "SUBSIDIARY_OF", props
+            client, "Organization", src, "Organization", tgt, "SUBSIDIARY_OF", _add_temporal(props)
         )
 
     # Money transfers — the heart of the investigation
@@ -1018,7 +1044,9 @@ def seed(client: FalkorDBClient) -> dict:
 
     print(f"   Creating {len(transfers)} financial transfers...")
     for src, tgt, props in transfers:
-        create_relationship(client, "Account", src, "Account", tgt, "TRANSFERRED_TO", props)
+        create_relationship(
+            client, "Account", src, "Account", tgt, "TRANSFERRED_TO", _add_temporal(props)
+        )
 
     # Located at
     locations = [
@@ -1085,7 +1113,9 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, src_label, tgt, props in locations:
-        create_relationship(client, src_label, src, "Address", tgt, "LOCATED_AT", props)
+        create_relationship(
+            client, src_label, src, "Address", tgt, "LOCATED_AT", _add_temporal(props)
+        )
 
     # Related to (personal connections)
     related = [
@@ -1098,7 +1128,9 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, tgt, props in related:
-        create_relationship(client, "Person", src, "Person", tgt, "RELATED_TO", props)
+        create_relationship(
+            client, "Person", src, "Person", tgt, "RELATED_TO", _add_temporal(props)
+        )
 
     # Contacted
     contacted = [
@@ -1119,7 +1151,7 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, tgt, props in contacted:
-        create_relationship(client, "Person", src, "Person", tgt, "CONTACTED", props)
+        create_relationship(client, "Person", src, "Person", tgt, "CONTACTED", _add_temporal(props))
 
     # Participated in events
     participations = [
@@ -1135,7 +1167,9 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, src_label, tgt, props in participations:
-        create_relationship(client, src_label, src, "Event", tgt, "PARTICIPATED_IN", props)
+        create_relationship(
+            client, src_label, src, "Event", tgt, "PARTICIPATED_IN", _add_temporal(props)
+        )
 
     # Mentioned in documents
     mentions = [
@@ -1165,7 +1199,9 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, src_label, tgt, props in mentions:
-        create_relationship(client, src_label, src, "Document", tgt, "MENTIONED_IN", props)
+        create_relationship(
+            client, src_label, src, "Document", tgt, "MENTIONED_IN", _add_temporal(props)
+        )
 
     # Employed by
     employed = [
@@ -1183,7 +1219,9 @@ def seed(client: FalkorDBClient) -> dict:
     ]
 
     for src, tgt, props in employed:
-        create_relationship(client, "Person", src, "Organization", tgt, "EMPLOYED_BY", props)
+        create_relationship(
+            client, "Person", src, "Organization", tgt, "EMPLOYED_BY", _add_temporal(props)
+        )
 
     # Print summary
     from src.database.schema import get_graph_stats

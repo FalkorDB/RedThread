@@ -79,4 +79,34 @@ const API = {
     exportSubgraph: (id, depth = 2) =>
         API.get(`/api/export/subgraph?entity_id=${id}&depth=${depth}`),
     generateReport: (id) => API.get(`/api/export/report?entity_id=${id}`),
+
+    // Temporal
+    graphAtTime: (date, entityId = null) => {
+        let url = `/api/temporal/graph-at?date=${date}`;
+        if (entityId) url += `&entity_id=${entityId}`;
+        return API.get(url);
+    },
+    temporalChanges: (start, end) =>
+        API.get(`/api/temporal/changes?start=${start}&end=${end}`),
+    temporalTimeline: () => API.get('/api/temporal/timeline'),
+    temporalDateRange: () => API.get('/api/temporal/date-range'),
+    entityTemporalProfile: (id) => API.get(`/api/temporal/entity/${id}`),
+
+    // Snapshots & Diff
+    createSnapshot: (investigationId, name) =>
+        API.post(`/api/snapshots/?investigation_id=${encodeURIComponent(investigationId)}&name=${encodeURIComponent(name)}`, {}),
+    listSnapshots: (investigationId = null) => {
+        let url = '/api/snapshots/';
+        if (investigationId) url += `?investigation_id=${investigationId}`;
+        return API.get(url);
+    },
+    diffSnapshots: (a, b) =>
+        API.get(`/api/snapshots/diff/compare?snapshot_a=${a}&snapshot_b=${b}`),
+    diffCurrent: (snapshotId) =>
+        API.get(`/api/snapshots/diff/current?snapshot_id=${snapshotId}`),
+
+    // Natural Language Query
+    nlQuery: (question) => API.post('/api/nlq/query', { question }),
+    nlTranslate: (question) => API.post('/api/nlq/translate', { question }),
+    nlExamples: () => API.get('/api/nlq/examples'),
 };
