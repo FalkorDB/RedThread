@@ -80,6 +80,12 @@ def validate_entity_data(label: str, data: dict[str, Any]) -> list[str]:
             if not DATE_PATTERN.match(str(data[date_field])):
                 errors.append(f"{date_field} must be in YYYY-MM-DD format")
 
+    # Ensure since <= until when both are present
+    since = data.get("since")
+    until = data.get("until")
+    if since and until and str(since) > str(until):
+        errors.append("since must be before or equal to until")
+
     # String length limits
     for field in ["name", "full_address", "description", "title", "summary"]:
         if field in data and data[field] and len(str(data[field])) > 1000:
@@ -132,5 +138,17 @@ def validate_relationship_data(rel_type: str, data: dict[str, Any]) -> list[str]
                         errors.append(f"{pct_field} must be between 0 and 100")
             except (ValueError, TypeError):
                 errors.append(f"{pct_field} must be a number")
+
+    # Temporal date validations
+    for date_field in ["date", "since", "until", "valid_from", "valid_to"]:
+        if date_field in data and data[date_field]:
+            if not DATE_PATTERN.match(str(data[date_field])):
+                errors.append(f"{date_field} must be in YYYY-MM-DD format")
+
+    # Ensure valid_from <= valid_to when both are present
+    vf = data.get("valid_from")
+    vt = data.get("valid_to")
+    if vf and vt and str(vf) > str(vt):
+        errors.append("valid_from must be before or equal to valid_to")
 
     return errors

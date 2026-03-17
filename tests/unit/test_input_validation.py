@@ -212,3 +212,101 @@ class TestRelationshipDataValidation:
         }
         errors = validate_relationship_data("OWNS", data)
         assert any("share_pct" in e for e in errors)
+
+
+class TestEntityTemporalValidation:
+    """Ensure since <= until for entities."""
+
+    def test_since_before_until_accepted(self):
+        errors = validate_entity_data(
+            "Person", {"name": "Test", "since": "2020-01-01", "until": "2023-12-31"}
+        )
+        assert not any("since" in e and "until" in e for e in errors)
+
+    def test_since_equals_until_accepted(self):
+        errors = validate_entity_data(
+            "Person", {"name": "Test", "since": "2022-06-15", "until": "2022-06-15"}
+        )
+        assert not any("since" in e and "until" in e for e in errors)
+
+    def test_since_after_until_rejected(self):
+        errors = validate_entity_data(
+            "Person", {"name": "Test", "since": "2025-01-01", "until": "2020-01-01"}
+        )
+        assert any("since must be before" in e for e in errors)
+
+    def test_only_since_no_until_accepted(self):
+        errors = validate_entity_data("Person", {"name": "Test", "since": "2020-01-01"})
+        assert not any("since must be before" in e for e in errors)
+
+    def test_only_until_no_since_accepted(self):
+        errors = validate_entity_data("Person", {"name": "Test", "until": "2020-01-01"})
+        assert not any("since must be before" in e for e in errors)
+
+    def test_invalid_since_format_still_caught(self):
+        errors = validate_entity_data("Person", {"name": "Test", "since": "not-a-date"})
+        assert any("since" in e and "YYYY-MM-DD" in e for e in errors)
+
+
+class TestRelationshipTemporalValidation:
+    """Ensure valid_from <= valid_to and date formats on relationships."""
+
+    _base = {
+        "source_id": "s1",
+        "target_id": "t1",
+        "source_label": "Person",
+        "target_label": "Organization",
+    }
+
+    def test_valid_from_before_valid_to_accepted(self):
+        data = {**self._base, "valid_from": "2020-01-01", "valid_to": "2023-12-31"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert not any("valid_from must be before" in e for e in errors)
+
+    def test_valid_from_equals_valid_to_accepted(self):
+        data = {**self._base, "valid_from": "2022-06-15", "valid_to": "2022-06-15"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert not any("valid_from must be before" in e for e in errors)
+
+    def test_valid_from_after_valid_to_rejected(self):
+        data = {**self._base, "valid_from": "2025-01-01", "valid_to": "2020-01-01"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("valid_from must be before" in e for e in errors)
+
+    def test_only_valid_from_accepted(self):
+        data = {**self._base, "valid_from": "2020-01-01"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert not any("valid_from must be before" in e for e in errors)
+
+    def test_only_valid_to_accepted(self):
+        data = {**self._base, "valid_to": "2023-12-31"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert not any("valid_from must be before" in e for e in errors)
+
+    def test_invalid_valid_from_format(self):
+        data = {**self._base, "valid_from": "Jan 2020"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("valid_from" in e and "YYYY-MM-DD" in e for e in errors)
+
+    def test_invalid_valid_to_format(self):
+        data = {**self._base, "valid_to": "2020/01/01"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("valid_to" in e and "YYYY-MM-DD" in e for e in errors)
+
+    def test_bad_format_and_bad_ordering(self):
+        """Invalid format should be caught even when ordering is also wrong."""
+        data = {**self._base, "valid_from": "bad", "valid_to": "2020-01-01"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("YYYY-MM-DD" in e for e in errors)
+
+    def test_relationship_date_field_validation(self):
+        """Relationship-level 'date' field is also validated."""
+        data = {**self._base, "date": "not-valid"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("date" in e and "YYYY-MM-DD" in e for e in errors)
+
+    def test_relationship_since_until_validated(self):
+        """Relationship-level 'since'/'until' are validated."""
+        data = {**self._base, "since": "not-a-date"}
+        errors = validate_relationship_data("DIRECTS", data)
+        assert any("since" in e and "YYYY-MM-DD" in e for e in errors)
