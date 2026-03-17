@@ -50,6 +50,17 @@ Import entities and relationships via CSV or JSON. Column mapping, validation, a
 ### 📋 Case Management
 Create investigations, pin entities of interest, save graph snapshots, tag entities, and export reports.
 
+### ⏳ Temporal Graph Analysis
+All relationships carry `valid_from` / `valid_to` properties. Use the timeline slider in the UI to view the graph as it existed at any point in time, see what changed between two dates, and explore entity temporal profiles — understand when connections formed and dissolved.
+
+### 📸 Graph Diff / Comparison Views
+Take snapshots of the current graph state and compare any two snapshots (or current state vs. a snapshot) to find added/removed nodes and relationships. Ideal for tracking how a network evolves over the course of an investigation.
+
+### 🗣️ Natural Language Query (LLM → Cypher)
+Type questions in plain English — e.g. *"show me all money flows from Kovacs to accounts in Panama"* — and the system translates them to Cypher queries via an OpenAI-compatible API. Includes safety checks (read-only queries only) and graceful degradation when no API key is configured.
+
+> **Note:** Natural Language Query requires an OpenAI-compatible API key set via `LLM_API_KEY`. The feature is optional — all other functionality works without it.
+
 ---
 
 ## Graph Schema
@@ -81,8 +92,8 @@ Create investigations, pin entities of interest, save graph snapshots, tag entit
 ### Option 1: Docker Compose (recommended)
 
 ```bash
-git clone https://github.com/FalkorDB/nova4.git
-cd nova4
+git clone https://github.com/FalkorDB/RedThread.git
+cd RedThread
 docker compose up -d
 # Seed with demo data:
 docker compose exec app python -m src.seed
@@ -177,6 +188,31 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | GET | `/api/export/subgraph?entity_id=X` | Export subgraph as JSON |
 | GET | `/api/export/report?entity_id=X` | Generate entity report |
 
+### Temporal Analysis
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/temporal/date-range` | Get earliest/latest dates in graph |
+| GET | `/api/temporal/graph-at?date=YYYY-MM-DD` | Get graph state at a point in time |
+| GET | `/api/temporal/changes?start=X&end=Y` | Get changes between two dates |
+| GET | `/api/temporal/timeline` | All dated relationships in chronological order |
+| GET | `/api/temporal/entity/{entity_id}` | Entity temporal profile |
+
+### Snapshots & Diff
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/snapshots/?investigation_id=X&name=Y` | Create a snapshot of current graph |
+| GET | `/api/snapshots/` | List all snapshots |
+| GET | `/api/snapshots/{id}` | Get a specific snapshot |
+| GET | `/api/snapshots/diff/compare?snapshot_a=X&snapshot_b=Y` | Diff two snapshots |
+| GET | `/api/snapshots/diff/current?snapshot_id=X` | Diff current graph vs a snapshot |
+
+### Natural Language Query
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/nlq/query` | Translate and execute NL query |
+| POST | `/api/nlq/translate` | Translate NL to Cypher without executing |
+| GET | `/api/nlq/examples` | Get example NL queries |
+
 ---
 
 ## Configuration
@@ -191,40 +227,43 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | `APP_DEBUG` | `false` | Debug mode |
 | `APP_LOG_LEVEL` | `info` | Log level |
 | `SQLITE_DB_PATH` | `./data/redthread.db` | SQLite database path |
+| `LLM_API_KEY` | `` | OpenAI-compatible API key (optional, for NL query) |
+| `LLM_BASE_URL` | `` | Custom LLM endpoint URL (optional) |
+| `LLM_MODEL` | `gpt-4o-mini` | LLM model to use for NL→Cypher |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   Web Browser                        │
-│  ┌──────────┐ ┌──────────┐ ┌────────┐ ┌─────────┐  │
-│  │ Graph Viz│ │ Timeline │ │ Search │ │  Tools  │  │
-│  │(vis-net) │ │  Panel   │ │  Bar   │ │  Panel  │  │
-│  └────┬─────┘ └────┬─────┘ └───┬────┘ └────┬────┘  │
-└───────┼────────────┼───────────┼───────────┼────────┘
-        │            │           │           │
-   ┌────▼────────────▼───────────▼───────────▼────┐
-   │              FastAPI REST API                  │
-   │  /entities  /analysis  /search  /import       │
-   └────┬────────────┬───────────┬───────────┬────┘
-        │            │           │           │
-   ┌────▼────┐  ┌────▼────┐  ┌──▼───┐  ┌───▼────┐
-   │ Entity  │  │Analysis │  │Search│  │Ingest  │
-   │ Service │  │ Service │  │ Svc  │  │Pipeline│
-   └────┬────┘  └────┬────┘  └──┬───┘  └───┬────┘
-        │            │          │           │
-   ┌────▼────────────▼──────────▼───────────▼────┐
-   │           Graph Query Layer                   │
-   │  queries | pathfinding | patterns | risk     │
-   └──────────────────┬──────────────────────────┘
+┌──────────────────────────────────────────────────────────────────┐
+│                         Web Browser                              │
+│  ┌──────────┐ ┌──────────┐ ┌────────┐ ┌─────────┐ ┌──────────┐ │
+│  │ Graph Viz│ │ Timeline │ │ Search │ │  Tools  │ │ NL Query │ │
+│  │(vis-net) │ │  Slider  │ │  Bar   │ │  Panel  │ │   Bar    │ │
+│  └────┬─────┘ └────┬─────┘ └───┬────┘ └────┬────┘ └────┬─────┘ │
+└───────┼────────────┼───────────┼───────────┼───────────┼────────┘
+        │            │           │           │           │
+   ┌────▼────────────▼───────────▼───────────▼───────────▼────┐
+   │                    FastAPI REST API                        │
+   │  /entities  /analysis  /temporal  /snapshots  /nlq        │
+   └────┬────────────┬───────────┬───────────┬──────────┬─────┘
+        │            │           │           │          │
+   ┌────▼────┐  ┌────▼────┐  ┌──▼──────┐ ┌─▼───────┐ ┌▼────────┐
+   │ Entity  │  │Analysis │  │Temporal │ │Snapshot │ │  NLQ    │
+   │ Service │  │ Service │  │ Service │ │& Diff   │ │ Service │
+   └────┬────┘  └────┬────┘  └──┬──────┘ └─┬───────┘ └┬────────┘
+        │            │          │           │          │
+   ┌────▼────────────▼──────────▼───────────▼──────────▼────┐
+   │              Graph Query Layer                          │
+   │  queries | pathfinding | patterns | risk | temporal    │
+   └──────────────────┬─────────────────────────────────────┘
                       │
            ┌──────────▼──────────┐
-           │      FalkorDB       │  ┌──────────┐
-           │  (Graph Database)   │  │  SQLite  │
-           └─────────────────────┘  │  (Cases) │
-                                    └──────────┘
+           │      FalkorDB       │  ┌──────────┐  ┌──────────┐
+           │  (Graph Database)   │  │  SQLite  │  │ LLM API  │
+           └─────────────────────┘  │  (Cases) │  │(optional)│
+                                    └──────────┘  └──────────┘
 ```
 
 ---

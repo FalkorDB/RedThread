@@ -1,5 +1,10 @@
 /** RedThread — Main Application Controller */
 
+function escapeHtml(str) {
+    if (str == null) return '';
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
 class RedThreadApp {
     constructor() {
         this.graph = null;
@@ -40,6 +45,17 @@ class RedThreadApp {
         document.getElementById('btn-clear').addEventListener('click', () => this._clearGraph());
         document.getElementById('btn-analyze').addEventListener('click', () => this._toggleAnalysis());
         document.getElementById('btn-patterns').addEventListener('click', () => this._runPatterns());
+        document.getElementById('btn-temporal').addEventListener('click', () => this.openTimeline());
+        document.getElementById('btn-nlq').addEventListener('click', () => this.openNLQ());
+        document.getElementById('btn-timeline-changes').addEventListener('click', () => this._showTimelineChanges());
+        document.getElementById('btn-nlq-run').addEventListener('click', () => this._runNLQuery());
+        document.getElementById('nlq-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') this._runNLQuery();
+        });
+        document.getElementById('nlq-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'nlq-modal') this.closeNLQ();
+        });
+        document.getElementById('timeline-slider').addEventListener('change', () => this._loadGraphAtTime());
 
         // Sidebar tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
@@ -472,6 +488,356 @@ class RedThreadApp {
             URL.revokeObjectURL(url);
             toast('Report exported', 'success');
         } catch { toast('Export failed', 'error'); }
+    }
+
+    // === Temporal Analysis ===
+    async openTimeline() {
+        const panel = document.getElementById('timeline-panel');
+        if (panel.classList.contains('open')) {
+            this.closeTimeline();
+            return;
+        }
+
+        toast('Loading timeline data...', 'info');
+        try {
+            const range = await API.temporalDateRange();
+            if (!range.earliest || !range.latest) {
+                toast('No temporal data available', 'warning');
+                return;
+            }
+
+            this._timelineRange = range;
+            this._timelineDates = this._generateDateList(range.earliest, range.latest);
+
+            document.getElementById('timeline-start').textContent = range.earliest;
+            document.getElementById('timeline-end').textContent = range.latest;
+
+            const slider = document.getElementById('timeline-slider');
+            slider.max = this._timelineDates.length - 1;
+            slider.value = slider.max;
+
+            this._updateTimelineDisplay(this._timelineDates.length - 1);
+            panel.classList.add('open');
+
+            slider.oninput = () => this._updateTimelineDisplay(parseInt(slider.value));
+        } catch {
+            toast('Failed to load timeline', 'error');
+        }
+    }
+
+    _generateDateList(start, end) {
+        const dates = [];
+        // Parse as YYYY-MM-DD components to avoid timezone issues
+        const [sy, sm] = start.split('-').map(Number);
+        const [ey, em, ed] = end.split('-').map(Number);
+        let year = sy, month = sm;
+        while (year < ey || (year === ey && month <= em)) {
+            dates.push(`${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-01`);
+            month++;
+            if (month > 12) { month = 1; year++; }
+        }
+        // Always include the exact end date
+        const endStr = end;
+        if (dates.length === 0 || dates[dates.length - 1] !== endStr) dates.push(endStr);
+        return dates;
+    }
+
+    _updateTimelineDisplay(index) {
+        const date = this._timelineDates[index];
+        document.getElementById('timeline-date-display').textContent = date;
+        document.getElementById('timeline-info').textContent = `${index + 1} / ${this._timelineDates.length}`;
+    }
+
+    async _loadGraphAtTime() {
+        const slider = document.getElementById('timeline-slider');
+        const date = this._timelineDates[parseInt(slider.value)];
+        toast(`Loading graph at ${date}...`, 'info');
+        try {
+            const data = await API.graphAtTime(date);
+            this.graph.clear();
+            if (data.nodes.length === 0) {
+                toast(`No active relationships at ${date}`, 'warning');
+                return;
+            }
+            for (const node of data.nodes) {
+                this.graph.addNode(node);
+            }
+            for (const edge of data.edges) {
+                this.graph.addEdge(edge);
+            }
+            this.graph.fitView();
+            toast(`${date}: ${data.node_count} entities, ${data.edge_count} relationships`, 'success');
+        } catch {
+            toast('Failed to load temporal graph', 'error');
+        }
+    }
+
+    async _showTimelineChanges() {
+        const slider = document.getElementById('timeline-slider');
+        const idx = parseInt(slider.value);
+        if (idx === 0) {
+            toast('No prior date to compare against', 'warning');
+            return;
+        }
+
+        const startDate = this._timelineDates[Math.max(0, idx - 1)];
+        const endDate = this._timelineDates[idx];
+
+        try {
+            const data = await API.temporalChanges(startDate, endDate);
+            const container = document.getElementById('timeline-changes');
+            container.innerHTML = '';
+
+            if (data.total_changes === 0) {
+                container.innerHTML = '<p style="color:var(--text-secondary);font-size:11px">No changes in this period</p>';
+                return;
+            }
+
+            data.appeared.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'change-item change-appeared';
+                const strong = document.createElement('strong');
+                strong.textContent = '+';
+                div.appendChild(strong);
+                div.appendChild(document.createTextNode(` ${c.source_name || c.source_id} `));
+                const span = document.createElement('span');
+                span.style.color = 'var(--text-secondary)';
+                span.textContent = (c.rel_type || '').replace(/_/g, ' ');
+                div.appendChild(span);
+                div.appendChild(document.createTextNode(` → ${c.target_name || c.target_id}`));
+                container.appendChild(div);
+            });
+
+            data.disappeared.forEach(c => {
+                const div = document.createElement('div');
+                div.className = 'change-item change-disappeared';
+                const strong = document.createElement('strong');
+                strong.textContent = '−';
+                div.appendChild(strong);
+                div.appendChild(document.createTextNode(` ${c.source_name || c.source_id} `));
+                const span = document.createElement('span');
+                span.style.color = 'var(--text-secondary)';
+                span.textContent = (c.rel_type || '').replace(/_/g, ' ');
+                div.appendChild(span);
+                div.appendChild(document.createTextNode(` → ${c.target_name || c.target_id}`));
+                container.appendChild(div);
+            });
+
+            toast(`${data.total_changes} changes found`, 'info');
+        } catch {
+            toast('Failed to load changes', 'error');
+        }
+    }
+
+    closeTimeline() {
+        document.getElementById('timeline-panel').classList.remove('open');
+    }
+
+    // === Snapshots & Diff ===
+    async takeSnapshot() {
+        const name = prompt('Snapshot name:', `Snapshot ${new Date().toISOString().slice(0, 16)}`);
+        if (!name) return;
+
+        try {
+            // Use a default investigation or create one
+            const investigations = await API.listInvestigations();
+            let invId;
+            if (investigations.length > 0) {
+                invId = investigations[0].id;
+            } else {
+                const inv = await API.createInvestigation({ name: 'Default Investigation', description: 'Auto-created for snapshots' });
+                invId = inv.id;
+            }
+            const result = await API.createSnapshot(invId, name);
+            toast(`Snapshot saved: ${result.node_count} nodes, ${result.relationship_count} relationships`, 'success');
+        } catch {
+            toast('Failed to save snapshot', 'error');
+        }
+    }
+
+    async openDiffView() {
+        try {
+            const snapshots = await API.listSnapshots();
+            if (snapshots.length < 1) {
+                toast('No snapshots found. Take a snapshot first.', 'warning');
+                return;
+            }
+
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            if (snapshots.length === 1) {
+                // Compare against current
+                content.innerHTML = '<h3>🔀 Comparing snapshot vs current graph...</h3><div class="spinner"></div>';
+                const diff = await API.diffCurrent(snapshots[0].id);
+                this._renderDiff(content, diff, `"${snapshots[0].name}" → Current`);
+            } else {
+                // Compare the two most recent snapshots
+                content.innerHTML = '<h3>🔀 Comparing most recent snapshots...</h3><div class="spinner"></div>';
+                const diff = await API.diffSnapshots(snapshots[1].id, snapshots[0].id);
+                this._renderDiff(content, diff, `"${snapshots[1].name}" → "${snapshots[0].name}"`);
+            }
+        } catch (e) {
+            toast('Diff failed: ' + e.message, 'error');
+        }
+    }
+
+    _renderDiff(container, diff, title) {
+        const s = diff.summary;
+        let html = `<h3>🔀 Graph Diff</h3>
+            <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">${title}</p>
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+                <span style="background:rgba(34,197,94,0.1);color:var(--success);padding:3px 8px;border-radius:4px;font-size:12px">+${s.nodes_added} nodes</span>
+                <span style="background:rgba(239,68,68,0.1);color:var(--accent);padding:3px 8px;border-radius:4px;font-size:12px">−${s.nodes_removed} nodes</span>
+                <span style="background:rgba(245,158,11,0.1);color:var(--warning);padding:3px 8px;border-radius:4px;font-size:12px">~${s.nodes_modified} modified</span>
+                <span style="background:rgba(34,197,94,0.1);color:var(--success);padding:3px 8px;border-radius:4px;font-size:12px">+${s.relationships_added} rels</span>
+                <span style="background:rgba(239,68,68,0.1);color:var(--accent);padding:3px 8px;border-radius:4px;font-size:12px">−${s.relationships_removed} rels</span>
+            </div>`;
+
+        if (s.total_changes === 0) {
+            html += '<p style="color:var(--text-secondary);font-size:12px">No differences found.</p>';
+        }
+
+        if (diff.added_nodes.length > 0) {
+            html += '<div class="diff-section"><h4>🟢 New Entities</h4>';
+            diff.added_nodes.forEach(n => {
+                html += `<div class="diff-item diff-added">${escapeHtml(n._label || 'Unknown')}: ${escapeHtml(n.name || n.account_number || n.id)}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (diff.removed_nodes.length > 0) {
+            html += '<div class="diff-section"><h4>🔴 Removed Entities</h4>';
+            diff.removed_nodes.forEach(n => {
+                html += `<div class="diff-item diff-removed">${escapeHtml(n._label || 'Unknown')}: ${escapeHtml(n.name || n.account_number || n.id)}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (diff.modified_nodes.length > 0) {
+            html += '<div class="diff-section"><h4>🟡 Modified Entities</h4>';
+            diff.modified_nodes.forEach(n => {
+                const changeStr = Object.entries(n.changes).map(([k, v]) => `${escapeHtml(k)}: ${escapeHtml(v.old)} → ${escapeHtml(v.new)}`).join(', ');
+                html += `<div class="diff-item diff-modified">${escapeHtml(n.label)}: ${escapeHtml(n.name)} — ${changeStr}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (diff.added_relationships.length > 0) {
+            html += '<div class="diff-section"><h4>🟢 New Relationships</h4>';
+            diff.added_relationships.forEach(r => {
+                html += `<div class="diff-item diff-added">${escapeHtml(r.source_id)} → ${escapeHtml((r.rel_type || '').replace(/_/g, ' '))} → ${escapeHtml(r.target_id)}</div>`;
+            });
+            html += '</div>';
+        }
+
+        if (diff.removed_relationships.length > 0) {
+            html += '<div class="diff-section"><h4>🔴 Removed Relationships</h4>';
+            diff.removed_relationships.forEach(r => {
+                html += `<div class="diff-item diff-removed">${escapeHtml(r.source_id)} → ${escapeHtml((r.rel_type || '').replace(/_/g, ' '))} → ${escapeHtml(r.target_id)}</div>`;
+            });
+            html += '</div>';
+        }
+
+        container.innerHTML = html;
+        toast(`Diff complete: ${s.total_changes} changes`, 'info');
+    }
+
+    // === Natural Language Query ===
+    async openNLQ() {
+        const modal = document.getElementById('nlq-modal');
+        modal.classList.add('open');
+
+        // Reset state
+        document.getElementById('nlq-result').style.display = 'none';
+        document.getElementById('nlq-error').style.display = 'none';
+        document.getElementById('nlq-input').value = '';
+
+        // Load examples
+        try {
+            const examples = await API.nlExamples();
+            const container = document.getElementById('nlq-examples');
+            container.innerHTML = '<span style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px">Try these:</span>';
+            examples.slice(0, 6).forEach(ex => {
+                const span = document.createElement('span');
+                span.className = 'nlq-example';
+                span.textContent = ex;
+                span.addEventListener('click', () => {
+                    document.getElementById('nlq-input').value = ex;
+                    this._runNLQuery(ex);
+                });
+                container.appendChild(span);
+            });
+        } catch {}
+
+        document.getElementById('nlq-input').focus();
+    }
+
+    closeNLQ() {
+        document.getElementById('nlq-modal').classList.remove('open');
+    }
+
+    async _runNLQuery(question) {
+        if (!question) {
+            question = document.getElementById('nlq-input').value.trim();
+        }
+        if (!question) {
+            toast('Enter a question first', 'warning');
+            return;
+        }
+
+        const resultEl = document.getElementById('nlq-result');
+        const errorEl = document.getElementById('nlq-error');
+        const cypherEl = document.getElementById('nlq-cypher');
+        const contentEl = document.getElementById('nlq-results-content');
+
+        resultEl.style.display = 'none';
+        errorEl.style.display = 'none';
+        contentEl.innerHTML = '<div class="spinner"></div>';
+
+        toast('Translating to Cypher...', 'info');
+
+        try {
+            const data = await API.nlQuery(question);
+
+            if (data.error) {
+                errorEl.textContent = data.error;
+                errorEl.style.display = 'block';
+                if (data.query) {
+                    cypherEl.textContent = data.query;
+                    resultEl.style.display = 'block';
+                }
+                return;
+            }
+
+            cypherEl.textContent = data.query;
+            resultEl.style.display = 'block';
+
+            if (!data.results || data.results.length === 0) {
+                contentEl.innerHTML = '<p style="color:var(--text-secondary);font-size:12px">No results found.</p>';
+            } else {
+                contentEl.innerHTML = '';
+                data.results.slice(0, 50).forEach(row => {
+                    const div = document.createElement('div');
+                    div.className = 'nlq-result-row';
+                    Object.entries(row).forEach(([key, val], i) => {
+                        if (i > 0) div.appendChild(document.createElement('br'));
+                        const keySpan = document.createElement('span');
+                        keySpan.className = 'key';
+                        keySpan.textContent = key + ':';
+                        div.appendChild(keySpan);
+                        const display = typeof val === 'object' ? JSON.stringify(val, null, 1) : String(val);
+                        div.appendChild(document.createTextNode(' ' + display));
+                    });
+                    contentEl.appendChild(div);
+                });
+                toast(`${data.count} results found`, 'success');
+            }
+        } catch (e) {
+            errorEl.textContent = 'Query failed: ' + e.message;
+            errorEl.style.display = 'block';
+        }
     }
 }
 

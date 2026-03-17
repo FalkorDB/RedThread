@@ -64,6 +64,22 @@ def test_client():
 
 
 @pytest.fixture
+def sqlite_client():
+    """Provide a fresh SQLite client for each test."""
+    import tempfile
+
+    from src.database.sqlite_client import SQLiteClient
+
+    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as f:
+        db_path = f.name
+    client = SQLiteClient(db_path=db_path)
+    client.connect()
+    yield client
+    client.close()
+    os.unlink(db_path)
+
+
+@pytest.fixture
 def seeded_graph(clean_graph):
     """A graph pre-seeded with test data."""
     from src.graph.queries import create_entity, create_relationship

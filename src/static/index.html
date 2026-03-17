@@ -35,6 +35,8 @@
         <button class="topbar-btn" onclick="app.startPathfind()" title="Find path between two nodes">🔗 Path Find</button>
         <button class="topbar-btn" id="btn-patterns" title="Run pattern detection">🔍 Patterns</button>
         <button class="topbar-btn" id="btn-analyze" title="Analysis tools">📊 Analyze</button>
+        <button class="topbar-btn" id="btn-temporal" title="Timeline view">⏱️ Timeline</button>
+        <button class="topbar-btn" id="btn-nlq" title="Ask a question">💬 Ask</button>
     </header>
 
     <!-- Sidebar -->
@@ -86,6 +88,22 @@
                     <h4>📄 Export Report</h4>
                     <p>Generate JSON report for selected entity</p>
                 </div>
+                <div class="analysis-tool" onclick="app.openTimeline()">
+                    <h4>⏱️ Timeline</h4>
+                    <p>See how the network evolved over time</p>
+                </div>
+                <div class="analysis-tool" onclick="app.takeSnapshot()">
+                    <h4>📸 Take Snapshot</h4>
+                    <p>Save current graph state for comparison</p>
+                </div>
+                <div class="analysis-tool" onclick="app.openDiffView()">
+                    <h4>🔀 Compare Snapshots</h4>
+                    <p>See what changed between two snapshots</p>
+                </div>
+                <div class="analysis-tool" onclick="app.openNLQ()">
+                    <h4>💬 Ask a Question</h4>
+                    <p>Query the graph in plain English</p>
+                </div>
             </div>
         </div>
     </aside>
@@ -116,6 +134,55 @@
             </div>
             <div id="analysis-content">
                 <p style="color:var(--text-secondary);font-size:12px">Run an analysis tool to see results here.</p>
+            </div>
+        </div>
+
+        <!-- Timeline Slider -->
+        <div id="timeline-panel">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                <span style="font-size:14px;font-weight:600">⏱️ Temporal View</span>
+                <div style="display:flex;gap:4px;align-items:center">
+                    <button class="btn btn-secondary" style="font-size:10px;padding:2px 6px" id="btn-timeline-changes">Show Changes</button>
+                    <button class="detail-close" onclick="app.closeTimeline()">✕</button>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+                <span id="timeline-date-display" style="font-size:18px;font-weight:600;color:var(--accent);min-width:110px">—</span>
+                <span id="timeline-info" style="font-size:11px;color:var(--text-secondary)"></span>
+            </div>
+            <input type="range" id="timeline-slider" min="0" max="100" value="100" style="width:100%;accent-color:var(--accent)">
+            <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text-secondary);margin-top:2px">
+                <span id="timeline-start">—</span>
+                <span id="timeline-end">—</span>
+            </div>
+            <div id="timeline-changes" style="margin-top:8px;max-height:200px;overflow-y:auto"></div>
+        </div>
+
+        <!-- NL Query Modal -->
+        <div id="nlq-modal" class="modal-overlay">
+            <div class="modal-content">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <h3 style="font-size:16px;font-weight:600">💬 Ask RedThread</h3>
+                    <button class="detail-close" onclick="app.closeNLQ()">✕</button>
+                </div>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+                    Ask a question in plain English and RedThread will translate it to a graph query.
+                </p>
+                <div style="display:flex;gap:6px;margin-bottom:12px">
+                    <input type="text" id="nlq-input" placeholder="e.g. Show me all money flows from Kovacs to accounts in Panama"
+                           style="flex:1;padding:8px 12px;border-radius:6px;border:1px solid var(--border);background:var(--bg-tertiary);color:var(--text-primary);font-size:13px">
+                    <button class="btn btn-primary" id="btn-nlq-run" style="padding:8px 16px">Ask</button>
+                </div>
+                <div id="nlq-examples" style="margin-bottom:12px">
+                    <span style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);display:block;margin-bottom:4px">Try these:</span>
+                </div>
+                <div id="nlq-result" style="display:none">
+                    <div style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">Generated Cypher:</div>
+                    <pre id="nlq-cypher" style="background:var(--bg-tertiary);padding:8px;border-radius:4px;font-size:11px;overflow-x:auto;color:#22c55e;margin-bottom:8px;white-space:pre-wrap"></pre>
+                    <div style="font-size:10px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">Results:</div>
+                    <div id="nlq-results-content" style="max-height:300px;overflow-y:auto"></div>
+                </div>
+                <div id="nlq-error" style="display:none;color:var(--accent);font-size:12px;padding:8px;background:rgba(239,68,68,0.1);border-radius:4px"></div>
             </div>
         </div>
     </main>
