@@ -36,6 +36,6 @@ docker-up:
 docker-down:
 	docker compose down
 
-demo: docker-up seed
+demo: docker-up
 	@echo "RedThread is running at http://localhost:8000"
-	@echo "Seed data loaded. Start investigating!"
+	@echo "Demo data is loaded automatically on first launch."
