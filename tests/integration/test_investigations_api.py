@@ -142,11 +142,21 @@ class TestInvestigationTags:
 
         tag_name = f"tag-{uuid.uuid4().hex[:8]}"
         resp = client.post("/api/investigations/tags", json={"name": tag_name, "color": "#ff0000"})
-        assert resp.status_code == 200
+        assert resp.status_code == 201
         data = resp.json()
         assert data["name"] == tag_name
         assert data["color"] == "#ff0000"
         assert "id" in data
+
+    def test_create_tag_duplicate_name(self, client: TestClient):
+        import uuid
+
+        tag_name = f"dup-{uuid.uuid4().hex[:8]}"
+        resp1 = client.post("/api/investigations/tags", json={"name": tag_name, "color": "#aaa"})
+        assert resp1.status_code == 201
+        resp2 = client.post("/api/investigations/tags", json={"name": tag_name, "color": "#bbb"})
+        assert resp2.status_code == 409
+        assert "already exists" in resp2.json()["detail"]
 
     def test_list_tags(self, client: TestClient):
         import uuid
@@ -171,6 +181,53 @@ class TestInvestigationTags:
             json={"name": f"flagged-{uuid.uuid4().hex[:8]}", "color": "#f00"},
         ).json()
         resp = client.post(f"/api/investigations/tags/p-1/{tag['id']}")
+        assert resp.status_code == 200
+
+    def test_tag_entity_nonexistent_tag(self, client: TestClient):
+        resp = client.post("/api/investigations/tags/p-1/nonexistent-tag-id")
+        assert resp.status_code == 404
+
+    def test_delete_tag(self, client: TestClient):
+        import uuid
+
+        tag = client.post(
+            "/api/investigations/tags",
+            json={"name": f"del-{uuid.uuid4().hex[:8]}", "color": "#000"},
+        ).json()
+        resp = client.delete(f"/api/investigations/tags/{tag['id']}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "deleted"
+        # Verify it's gone
+        resp2 = client.delete(f"/api/investigations/tags/{tag['id']}")
+        assert resp2.status_code == 404
+
+    def test_delete_tag_not_found(self, client: TestClient):
+        resp = client.delete("/api/investigations/tags/no-such-tag")
+        assert resp.status_code == 404
+
+    def test_untag_entity(self, client: TestClient):
+        import uuid
+
+        tag = client.post(
+            "/api/investigations/tags",
+            json={"name": f"rm-{uuid.uuid4().hex[:8]}", "color": "#000"},
+        ).json()
+        client.post(f"/api/investigations/tags/p-1/{tag['id']}")
+        resp = client.delete(f"/api/investigations/tags/p-1/{tag['id']}")
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "untagged"
+
+    def test_delete_tag_cascades_entity_tags(self, client: TestClient):
+        """Deleting a tag should also remove all entity_tags referencing it."""
+        import uuid
+
+        tag = client.post(
+            "/api/investigations/tags",
+            json={"name": f"cascade-{uuid.uuid4().hex[:8]}", "color": "#000"},
+        ).json()
+        client.post(f"/api/investigations/tags/p-1/{tag['id']}")
+        client.post(f"/api/investigations/tags/p-2/{tag['id']}")
+        resp = client.delete(f"/api/investigations/tags/{tag['id']}")
         assert resp.status_code == 200
 
 

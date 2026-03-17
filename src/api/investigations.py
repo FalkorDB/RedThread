@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 import uuid
 from datetime import UTC, datetime
 from typing import Any
@@ -187,20 +188,45 @@ def list_tags(limit: int = Query(100, ge=1, le=500)) -> list[dict[str, Any]]:
     return sqlite_db.fetchall("SELECT * FROM tags ORDER BY name LIMIT ?", (limit,))
 
 
-@router.post("/tags")
+@router.post("/tags", status_code=201)
 def create_tag(data: TagCreate) -> dict[str, Any]:
     tag_id = _new_id()
-    sqlite_db.execute(
-        "INSERT INTO tags (id, name, color) VALUES (?, ?, ?)", (tag_id, data.name, data.color)
-    )
-    sqlite_db.commit()
+    try:
+        sqlite_db.execute(
+            "INSERT INTO tags (id, name, color) VALUES (?, ?, ?)", (tag_id, data.name, data.color)
+        )
+        sqlite_db.commit()
+    except sqlite3.IntegrityError:
+        raise HTTPException(status_code=409, detail=f"Tag '{data.name}' already exists") from None
     return {"id": tag_id, "name": data.name, "color": data.color}
+
+
+@router.delete("/tags/{tag_id}")
+def delete_tag(tag_id: str) -> dict[str, str]:
+    row = sqlite_db.fetchone("SELECT id FROM tags WHERE id = ?", (tag_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    sqlite_db.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+    sqlite_db.commit()
+    return {"status": "deleted"}
 
 
 @router.post("/tags/{entity_id}/{tag_id}")
 def tag_entity(entity_id: str, tag_id: str) -> dict[str, str]:
+    row = sqlite_db.fetchone("SELECT id FROM tags WHERE id = ?", (tag_id,))
+    if not row:
+        raise HTTPException(status_code=404, detail="Tag not found")
     sqlite_db.execute(
         "INSERT OR IGNORE INTO entity_tags (entity_id, tag_id) VALUES (?, ?)", (entity_id, tag_id)
     )
     sqlite_db.commit()
     return {"status": "tagged"}
+
+
+@router.delete("/tags/{entity_id}/{tag_id}")
+def untag_entity(entity_id: str, tag_id: str) -> dict[str, str]:
+    sqlite_db.execute(
+        "DELETE FROM entity_tags WHERE entity_id = ? AND tag_id = ?", (entity_id, tag_id)
+    )
+    sqlite_db.commit()
+    return {"status": "untagged"}
