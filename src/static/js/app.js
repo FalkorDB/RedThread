@@ -124,6 +124,10 @@ class RedThreadApp {
                 this.pathTarget = nodeId;
                 this._findPath(this.pathSource, this.pathTarget);
             }
+        } else if (this.mode === 'shared') {
+            this._runSharedConnections(this._sharedSource, nodeId);
+        } else if (this.mode === 'hidden') {
+            this._runHiddenConnections(this._hiddenSource, nodeId);
         }
     }
 
@@ -465,6 +469,213 @@ class RedThreadApp {
                 content.appendChild(div);
             });
         } catch { toast('Failed to load centrality data', 'error'); }
+    }
+
+    async showEntityReach() {
+        if (!this.currentEntity) {
+            toast('Select an entity first', 'warning');
+            return;
+        }
+        toast('Computing entity reach...', 'info');
+        try {
+            const data = await API.entityReach(this.currentEntity.id, 3);
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+            const name = this.currentEntity.name || this.currentEntity.account_number || this.currentEntity.id;
+            let html = `<h3>🌐 Reach from ${escapeHtml(name)}</h3>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">
+                    ${data.total_reached} entities reachable within ${data.max_depth} hops
+                </p>`;
+            if (data.by_distance) {
+                for (const [dist, entities] of Object.entries(data.by_distance)) {
+                    html += `<div style="margin-top:8px"><h4 style="font-size:11px;text-transform:uppercase;color:var(--text-secondary);margin-bottom:4px">Depth ${escapeHtml(dist)} (${entities.length} entities)</h4>`;
+                    entities.slice(0, 10).forEach(e => {
+                        html += `<div class="entity-item" style="margin-bottom:3px;cursor:pointer" data-id="${escapeHtml(e.id)}">
+                            <span class="entity-badge badge-${(e.label || 'unknown').toLowerCase()}">${(e.label || '?')[0]}</span>
+                            <span class="entity-name">${escapeHtml(e.name || e.account_number || e.id)}</span>
+                        </div>`;
+                    });
+                    if (entities.length > 10) {
+                        html += `<p style="font-size:10px;color:var(--text-secondary)">...and ${entities.length - 10} more</p>`;
+                    }
+                    html += '</div>';
+                }
+            }
+            content.innerHTML = html;
+            content.querySelectorAll('.entity-item[data-id]').forEach(el => {
+                el.addEventListener('click', () => this._focusEntityById(el.dataset.id));
+            });
+            toast(`${data.total_reached} reachable entities`, 'success');
+        } catch {
+            toast('Entity reach analysis failed', 'error');
+        }
+    }
+
+    async showBridges() {
+        toast('Finding bridge entities...', 'info');
+        try {
+            const bridges = await API.bridges();
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            let html = `<h3>🌉 Bridge Entities</h3>
+                <p style="font-size:12px;color:var(--text-secondary);margin-bottom:12px">
+                    Entities that connect otherwise separate groups — removing them would disconnect the network.
+                </p>`;
+
+            if (!bridges || bridges.length === 0) {
+                html += '<p style="color:var(--text-secondary);font-size:12px">No bridge entities detected.</p>';
+            } else {
+                bridges.forEach(b => {
+                    html += `<div class="entity-item" style="margin-bottom:4px;cursor:pointer" data-id="${escapeHtml(b.id)}">
+                        <span class="entity-badge badge-${(b.label || 'unknown').toLowerCase()}">${(b.label || '?')[0]}</span>
+                        <span class="entity-name">${escapeHtml(b.name || b.account_number || b.id)}</span>
+                        <span style="color:var(--warning);font-size:11px">${b.degree ? b.degree + ' links' : ''}</span>
+                    </div>`;
+                });
+            }
+            content.innerHTML = html;
+            content.querySelectorAll('.entity-item[data-id]').forEach(el => {
+                el.addEventListener('click', () => this._focusEntityById(el.dataset.id));
+            });
+            toast(`${(bridges || []).length} bridge entities found`, 'success');
+        } catch {
+            toast('Bridge detection failed', 'error');
+        }
+    }
+
+    startSharedConnections() {
+        if (!this.currentEntity) {
+            toast('Select a first entity, then click "Shared Connections" again', 'warning');
+            return;
+        }
+        this._sharedSource = this.currentEntity.id;
+        this._sharedSourceName = this.currentEntity.name || this.currentEntity.account_number || this.currentEntity.id;
+        this.mode = 'shared';
+        toast(`Source: ${this._sharedSourceName}. Click another node to find shared connections.`, 'info');
+    }
+
+    async _runSharedConnections(id1, id2) {
+        toast('Finding shared connections...', 'info');
+        try {
+            const shared = await API.sharedConnections(id1, id2);
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            let html = `<h3>🤝 Shared Connections</h3>`;
+            if (!shared || shared.length === 0) {
+                html += '<p style="color:var(--text-secondary);font-size:12px">No shared connections found.</p>';
+            } else {
+                html += `<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">${shared.length} mutual connections</p>`;
+                shared.forEach(s => {
+                    html += `<div class="entity-item" style="margin-bottom:4px;cursor:pointer" data-id="${escapeHtml(s.id)}">
+                        <span class="entity-badge badge-${(s.label || 'unknown').toLowerCase()}">${(s.label || '?')[0]}</span>
+                        <span class="entity-name">${escapeHtml(s.name || s.account_number || s.id)}</span>
+                    </div>`;
+                });
+            }
+            content.innerHTML = html;
+            content.querySelectorAll('.entity-item[data-id]').forEach(el => {
+                el.addEventListener('click', () => this._focusEntityById(el.dataset.id));
+            });
+            toast(`${(shared || []).length} shared connections`, 'success');
+        } catch {
+            toast('Shared connections analysis failed', 'error');
+        }
+        this.mode = 'explore';
+    }
+
+    startHiddenConnections() {
+        if (!this.currentEntity) {
+            toast('Select a first entity, then click "Hidden Connections" again', 'warning');
+            return;
+        }
+        this._hiddenSource = this.currentEntity.id;
+        this._hiddenSourceName = this.currentEntity.name || this.currentEntity.account_number || this.currentEntity.id;
+        this.mode = 'hidden';
+        toast(`Source: ${this._hiddenSourceName}. Click another node to find hidden connections.`, 'info');
+    }
+
+    async _runHiddenConnections(id1, id2) {
+        toast('Discovering hidden connections...', 'info');
+        try {
+            const data = await API.hiddenConnections(id1, id2);
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            const connections = data.connections || [];
+            let html = `<h3>🕵️ Hidden Connections</h3>`;
+            if (connections.length === 0) {
+                html += '<p style="color:var(--text-secondary);font-size:12px">No hidden connections found between these entities.</p>';
+            } else {
+                html += `<p style="font-size:12px;color:var(--text-secondary);margin-bottom:8px">${connections.length} indirect connections discovered</p>`;
+                connections.slice(0, 10).forEach((conn, i) => {
+                    const nodes = conn.path ? conn.path.nodes : [];
+                    const names = nodes.map(n => escapeHtml(n.name || n.account_number || n.id));
+                    html += `<div class="path-result">
+                        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px">Connection ${i + 1} (${conn.hops} hops)</div>
+                        <div class="path-nodes">${names.join(' <span class="path-arrow">→</span> ')}</div>
+                    </div>`;
+                });
+            }
+            content.innerHTML = html;
+            toast(`${connections.length} hidden connections found`, 'success');
+        } catch {
+            toast('Hidden connection analysis failed', 'error');
+        }
+        this.mode = 'explore';
+    }
+
+    async validateGraph() {
+        toast('Validating graph data quality...', 'info');
+        try {
+            const data = await API.get('/api/analysis/validate');
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            let html = `<h3>🩺 Data Quality Report</h3>`;
+
+            const checks = [
+                { key: 'orphaned_nodes', title: '🔵 Orphaned Nodes', desc: 'Entities with no relationships' },
+                { key: 'missing_names', title: '🟡 Missing Names', desc: 'Entities without a name property' },
+                { key: 'duplicate_ids', title: '🔴 Duplicate IDs', desc: 'Multiple entities sharing an ID' },
+                { key: 'self_references', title: '🟠 Self-References', desc: 'Entities with relationships to themselves' },
+            ];
+
+            let totalIssues = 0;
+            for (const check of checks) {
+                const items = data[check.key] || [];
+                totalIssues += items.length;
+                html += `<div style="margin-top:10px">
+                    <h4 style="font-size:12px;margin-bottom:4px">${check.title} (${items.length})</h4>
+                    <p style="font-size:10px;color:var(--text-secondary);margin-bottom:4px">${check.desc}</p>`;
+                if (items.length === 0) {
+                    html += '<p style="font-size:11px;color:var(--success)">✓ None found</p>';
+                } else {
+                    items.slice(0, 8).forEach(item => {
+                        html += `<div style="font-size:11px;padding:2px 4px;background:var(--bg-tertiary);border-radius:3px;margin-bottom:2px">
+                            ${escapeHtml(item.label || '')} ${escapeHtml(item.name || item.id || JSON.stringify(item))}
+                        </div>`;
+                    });
+                    if (items.length > 8) {
+                        html += `<p style="font-size:10px;color:var(--text-secondary)">...and ${items.length - 8} more</p>`;
+                    }
+                }
+                html += '</div>';
+            }
+
+            const status = totalIssues === 0 ? '✅ All checks passed!' : `⚠️ ${totalIssues} issues found`;
+            html = html.replace('</h3>', `</h3><p style="font-size:13px;margin-bottom:8px;font-weight:600">${status}</p>`);
+            content.innerHTML = html;
+            toast(status, totalIssues === 0 ? 'success' : 'warning');
+        } catch {
+            toast('Validation failed', 'error');
+        }
     }
 
     _clearGraph() {

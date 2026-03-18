@@ -84,6 +84,26 @@
                     <h4>🎯 Most Connected</h4>
                     <p>Find the most connected entities</p>
                 </div>
+                <div class="analysis-tool" onclick="app.showEntityReach()">
+                    <h4>🌐 Entity Reach</h4>
+                    <p>Map all entities reachable within N hops</p>
+                </div>
+                <div class="analysis-tool" onclick="app.showBridges()">
+                    <h4>🌉 Bridge Entities</h4>
+                    <p>Find entities that connect otherwise separate groups</p>
+                </div>
+                <div class="analysis-tool" onclick="app.startSharedConnections()">
+                    <h4>🤝 Shared Connections</h4>
+                    <p>Find mutual connections between two entities</p>
+                </div>
+                <div class="analysis-tool" onclick="app.startHiddenConnections()">
+                    <h4>🕵️ Hidden Connections</h4>
+                    <p>Discover indirect links between two entities</p>
+                </div>
+                <div class="analysis-tool" onclick="app.validateGraph()">
+                    <h4>🩺 Data Quality</h4>
+                    <p>Check for orphaned nodes, missing names, duplicates</p>
+                </div>
                 <div class="analysis-tool" onclick="app.exportReport()">
                     <h4>📄 Export Report</h4>
                     <p>Generate JSON report for selected entity</p>
@@ -207,6 +227,9 @@
                     <button class="btn btn-primary" onclick="app.findPathBetween()" style="font-size:11px;padding:4px 8px">🔗 Find Paths From</button>
                     <button class="btn btn-secondary" onclick="app.runMoneyFlow()" style="font-size:11px;padding:4px 8px">💰 Money Flow</button>
                     <button class="btn btn-secondary" onclick="app.computeRisk()" style="font-size:11px;padding:4px 8px">⚠️ Risk</button>
+                    <button class="btn btn-secondary" onclick="app.showEntityReach()" style="font-size:11px;padding:4px 8px">🌐 Reach</button>
+                    <button class="btn btn-secondary" onclick="app.startSharedConnections()" style="font-size:11px;padding:4px 8px">🤝 Shared</button>
+                    <button class="btn btn-secondary" onclick="app.startHiddenConnections()" style="font-size:11px;padding:4px 8px">🕵️ Hidden</button>
                     <button class="btn btn-secondary" onclick="app.exportReport()" style="font-size:11px;padding:4px 8px">📄 Report</button>
                 </div>
             </div>
