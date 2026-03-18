@@ -1033,6 +1033,56 @@ class RedThreadApp {
         document.getElementById('nlq-input').focus();
     }
 
+    exportCSV() {
+        const panel = document.getElementById('analysis-panel');
+        panel.classList.add('open');
+        const content = document.getElementById('analysis-content');
+
+        const labels = ['Person', 'Organization', 'Account', 'Property', 'Event', 'Document', 'Address'];
+        const relTypes = ['DIRECTS', 'OWNS', 'TRANSFERRED_TO', 'SUBSIDIARY_OF', 'EMPLOYED_BY', 'LOCATED_AT', 'ASSOCIATED_WITH', 'CONTACTED', 'RELATED_TO', 'PARTICIPATED_IN', 'MENTIONED_IN'];
+
+        let html = `<h3>📥 CSV Export</h3>
+            <div style="margin-bottom:16px">
+                <h4 style="font-size:12px;margin-bottom:8px">Export Entities</h4>
+                <div style="display:flex;gap:4px;flex-wrap:wrap">`;
+        labels.forEach(label => {
+            html += `<button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="app._downloadCSV('/api/export/entities/csv?label=${label}', '${label.toLowerCase()}.csv')">${label}</button>`;
+        });
+        html += `</div></div>
+            <div>
+                <h4 style="font-size:12px;margin-bottom:8px">Export Relationships</h4>
+                <div style="display:flex;gap:4px;flex-wrap:wrap">
+                    <button class="btn btn-primary" style="font-size:11px;padding:4px 8px" onclick="app._downloadCSV('/api/export/relationships/csv', 'all_relationships.csv')">All Types</button>`;
+        relTypes.forEach(rt => {
+            html += `<button class="btn btn-secondary" style="font-size:11px;padding:4px 8px" onclick="app._downloadCSV('/api/export/relationships/csv?rel_type=${rt}', '${rt.toLowerCase()}.csv')">${rt.replace(/_/g, ' ')}</button>`;
+        });
+        html += `</div></div>`;
+        content.innerHTML = html;
+    }
+
+    async _downloadCSV(url, fallbackName) {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) {
+                const err = await resp.json();
+                toast(err.detail || 'Export failed', 'error');
+                return;
+            }
+            const blob = await resp.blob();
+            const disposition = resp.headers.get('Content-Disposition') || '';
+            const match = disposition.match(/filename="(.+?)"/);
+            const filename = match ? match[1] : fallbackName;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            toast(`Exported: ${filename}`, 'success');
+        } catch {
+            toast('CSV export failed', 'error');
+        }
+    }
+
     closeNLQ() {
         document.getElementById('nlq-modal').classList.remove('open');
     }
