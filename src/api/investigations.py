@@ -230,3 +230,13 @@ def untag_entity(entity_id: str, tag_id: str) -> dict[str, str]:
     )
     sqlite_db.commit()
     return {"status": "untagged"}
+
+
+@router.get("/tags/entity/{entity_id}")
+def get_entity_tags(entity_id: str) -> list[dict[str, Any]]:
+    return sqlite_db.fetchall(
+        "SELECT t.id, t.name, t.color FROM tags t "
+        "INNER JOIN entity_tags et ON t.id = et.tag_id "
+        "WHERE et.entity_id = ? ORDER BY t.name",
+        (entity_id,),
+    )

@@ -108,6 +108,17 @@ const API = {
     diffCurrent: (snapshotId) =>
         API.get(`/api/snapshots/diff/current?snapshot_id=${encodeURIComponent(snapshotId)}`),
 
+    // Tags
+    listTags: () => API.get('/api/investigations/tags/all'),
+    createTag: (name, color) => API.post('/api/investigations/tags', { name, color }),
+    deleteTag: (tagId) => API.del(`/api/investigations/tags/${tagId}`),
+    tagEntity: (entityId, tagId) =>
+        API.post(`/api/investigations/tags/${entityId}/${tagId}`, {}),
+    untagEntity: (entityId, tagId) =>
+        API.del(`/api/investigations/tags/${entityId}/${tagId}`),
+    getEntityTags: (entityId) =>
+        API.get(`/api/investigations/tags/entity/${entityId}`),
+
     // Natural Language Query
     nlQuery: (question) => API.post('/api/nlq/query', { question }),
     nlTranslate: (question) => API.post('/api/nlq/translate', { question }),

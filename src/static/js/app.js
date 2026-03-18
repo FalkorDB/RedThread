@@ -178,8 +178,9 @@ class RedThreadApp {
             `;
         }
 
-        // Load relationships
+        // Load relationships and tags
         this._loadRelationships(entity.id);
+        this._loadEntityTags(entity.id);
     }
 
     async _loadRelationships(entityId) {
@@ -1031,6 +1032,121 @@ class RedThreadApp {
         } catch {}
 
         document.getElementById('nlq-input').focus();
+    }
+
+    // === Tags ===
+    async _loadEntityTags(entityId) {
+        const container = document.getElementById('detail-tags');
+        container.innerHTML = '';
+        try {
+            const tags = await API.getEntityTags(entityId);
+            tags.forEach(tag => {
+                const chip = document.createElement('span');
+                chip.style.cssText = `display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:12px;font-size:11px;background:${escapeHtml(tag.color)}33;color:${escapeHtml(tag.color)};border:1px solid ${escapeHtml(tag.color)}66`;
+                chip.innerHTML = `${escapeHtml(tag.name)} <span style="cursor:pointer;font-weight:bold" onclick="app.removeTagFromEntity('${tag.id}')">&times;</span>`;
+                container.appendChild(chip);
+            });
+            if (tags.length === 0) {
+                container.innerHTML = '<span style="color:var(--text-secondary);font-size:11px">No tags</span>';
+            }
+        } catch {
+            container.innerHTML = '<span style="color:var(--text-secondary);font-size:11px">—</span>';
+        }
+        this._loadTagSelect();
+    }
+
+    async _loadTagSelect() {
+        const select = document.getElementById('tag-select');
+        select.innerHTML = '<option value="">Add tag…</option>';
+        try {
+            const tags = await API.listTags();
+            tags.forEach(tag => {
+                const opt = document.createElement('option');
+                opt.value = tag.id;
+                opt.textContent = tag.name;
+                opt.style.color = tag.color;
+                select.appendChild(opt);
+            });
+        } catch { /* ignore */ }
+    }
+
+    async addTagToEntity() {
+        const select = document.getElementById('tag-select');
+        const tagId = select.value;
+        if (!tagId || !this.currentEntity) return;
+        try {
+            await API.tagEntity(this.currentEntity.id, tagId);
+            toast('Tag added', 'success');
+            this._loadEntityTags(this.currentEntity.id);
+        } catch {
+            toast('Failed to add tag', 'error');
+        }
+    }
+
+    async removeTagFromEntity(tagId) {
+        if (!this.currentEntity) return;
+        try {
+            await API.untagEntity(this.currentEntity.id, tagId);
+            toast('Tag removed', 'success');
+            this._loadEntityTags(this.currentEntity.id);
+        } catch {
+            toast('Failed to remove tag', 'error');
+        }
+    }
+
+    async manageTags() {
+        const panel = document.getElementById('analysis-panel');
+        panel.classList.add('open');
+        const content = document.getElementById('analysis-content');
+        content.innerHTML = '<div class="spinner"></div>';
+        try {
+            const tags = await API.listTags();
+            let html = `<h3>🏷️ Manage Tags</h3>
+                <div style="display:flex;gap:4px;margin-bottom:12px">
+                    <input id="new-tag-name" placeholder="Tag name" style="flex:1;font-size:12px;padding:4px 8px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:4px">
+                    <input id="new-tag-color" type="color" value="#6366f1" style="width:32px;height:28px;padding:0;border:none;cursor:pointer">
+                    <button class="btn btn-primary" onclick="app._createTag()" style="font-size:11px;padding:4px 8px">Create</button>
+                </div>
+                <div id="tag-list">`;
+            if (tags.length === 0) {
+                html += '<p style="color:var(--text-secondary);font-size:12px">No tags yet. Create one above.</p>';
+            } else {
+                tags.forEach(tag => {
+                    html += `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+                        <span style="width:12px;height:12px;border-radius:50%;background:${escapeHtml(tag.color)};flex-shrink:0"></span>
+                        <span style="flex:1;font-size:13px">${escapeHtml(tag.name)}</span>
+                        <button class="btn btn-secondary" onclick="app._deleteTag('${tag.id}')" style="font-size:10px;padding:2px 6px;color:var(--accent)">Delete</button>
+                    </div>`;
+                });
+            }
+            html += '</div>';
+            content.innerHTML = html;
+        } catch {
+            content.innerHTML = '<p style="color:var(--accent)">Failed to load tags</p>';
+        }
+    }
+
+    async _createTag() {
+        const name = document.getElementById('new-tag-name').value.trim();
+        const color = document.getElementById('new-tag-color').value;
+        if (!name) { toast('Enter a tag name', 'warning'); return; }
+        try {
+            await API.createTag(name, color);
+            toast(`Tag "${name}" created`, 'success');
+            this.manageTags();
+        } catch {
+            toast('Failed to create tag (duplicate name?)', 'error');
+        }
+    }
+
+    async _deleteTag(tagId) {
+        try {
+            await API.deleteTag(tagId);
+            toast('Tag deleted', 'success');
+            this.manageTags();
+        } catch {
+            toast('Failed to delete tag', 'error');
+        }
     }
 
     exportCSV() {
