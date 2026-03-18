@@ -142,11 +142,20 @@ app.include_router(nlquery_router)
 
 @app.get("/api/health")
 def health_check() -> dict:
-    """Application health check."""
+    """Application health check with graph statistics."""
+    from src.database.schema import get_graph_stats
+
     falkordb_health = db.health_check()
+    graph_stats = {}
+    try:
+        graph_stats = get_graph_stats(db)
+    except Exception:
+        pass
+
     return {
         "status": "healthy" if falkordb_health["status"] == "healthy" else "degraded",
         "falkordb": falkordb_health,
+        "graph": graph_stats,
         "version": "0.1.0",
     }
 
