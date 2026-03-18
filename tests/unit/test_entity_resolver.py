@@ -207,3 +207,43 @@ class TestMergeEntities:
         merge_entities(clean_graph, "md-keep", "md-merge")
         assert get_entity(clean_graph, "Person", "md-merge") is None
         assert get_entity(clean_graph, "Person", "md-keep") is not None
+
+    def test_merge_incoming_failure_logged(self, clean_graph):
+        """Cover entity_resolver lines 114-115 (merge incoming fails)."""
+        from unittest.mock import MagicMock, patch
+
+        from src.ingestion.entity_resolver import merge_entities
+
+        mock_client = MagicMock()
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                raise RuntimeError("incoming fail")
+
+        mock_client.query.side_effect = side_effect
+        with patch("src.ingestion.entity_resolver.logger") as mock_logger:
+            merge_entities(mock_client, "k1", "m1")
+            mock_logger.warning.assert_any_call("merge_incoming_failed", error="incoming fail")
+
+    def test_merge_outgoing_failure_logged(self, clean_graph):
+        """Cover entity_resolver lines 129-130 (merge outgoing fails)."""
+        from unittest.mock import MagicMock, patch
+
+        from src.ingestion.entity_resolver import merge_entities
+
+        mock_client = MagicMock()
+        call_count = 0
+
+        def side_effect(*args, **kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 2:
+                raise RuntimeError("outgoing fail")
+
+        mock_client.query.side_effect = side_effect
+        with patch("src.ingestion.entity_resolver.logger") as mock_logger:
+            merge_entities(mock_client, "k2", "m2")
+            mock_logger.warning.assert_any_call("merge_outgoing_failed", error="outgoing fail")

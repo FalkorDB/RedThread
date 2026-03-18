@@ -120,3 +120,23 @@ class TestEntityResolver:
         assert normalize_name("  Test Corp LLC  ") == "test corp"
         assert normalize_name("Big Company Ltd") == "big company"
         assert normalize_name("Simple Name") == "simple name"
+
+
+class TestEntityFromNode:
+    """Cover entity_from_node edge cases (entities.py lines 204, 208-213)."""
+
+    def test_unknown_label_raises(self):
+        with pytest.raises(ValueError, match="Unknown entity label"):
+            entity_from_node("FakeLabel", {"name": "x"})
+
+    def test_aliases_as_json_string(self):
+        entity = entity_from_node("Person", {"id": "p1", "name": "Jane", "aliases": '["J","JD"]'})
+        assert entity.aliases == ["J", "JD"]
+
+    def test_aliases_as_bad_json_string(self):
+        entity = entity_from_node("Person", {"id": "p2", "name": "Jane", "aliases": "not-json"})
+        assert entity.aliases == []
+
+    def test_aliases_as_list(self):
+        entity = entity_from_node("Person", {"id": "p3", "name": "Jane", "aliases": ["A", "B"]})
+        assert entity.aliases == ["A", "B"]

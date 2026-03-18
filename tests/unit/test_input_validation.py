@@ -447,3 +447,55 @@ class TestValidationErrorClass:
         err = ValidationError(["only one error"])
         assert len(err.errors) == 1
         assert "only one error" in str(err)
+
+
+class TestRelationshipMissingLabelFields:
+    """Cover missing source_label / target_label fields (lines 111, 113)."""
+
+    def test_missing_source_label(self):
+        data = {"source_id": "s1", "target_id": "t1", "target_label": "Person"}
+        errors = validate_relationship_data("ASSOCIATED_WITH", data)
+        assert any("source_label" in e for e in errors)
+
+    def test_missing_target_label(self):
+        data = {"source_id": "s1", "target_id": "t1", "source_label": "Person"}
+        errors = validate_relationship_data("ASSOCIATED_WITH", data)
+        assert any("target_label" in e for e in errors)
+
+
+class TestNonNumericAmountAndPercentage:
+    """Cover non-numeric amount and pct_field (lines 139-140, 153-154)."""
+
+    _base = {
+        "source_id": "s1",
+        "target_id": "t1",
+        "source_label": "Account",
+        "target_label": "Account",
+    }
+
+    def test_transfer_non_numeric_amount(self):
+        data = {**self._base, "amount": "not-a-number"}
+        errors = validate_relationship_data("TRANSFERRED_TO", data)
+        assert any("amount must be a number" in e.lower() for e in errors)
+
+    def test_share_pct_non_numeric(self):
+        data = {
+            "source_id": "s1",
+            "target_id": "t1",
+            "source_label": "Person",
+            "target_label": "Account",
+            "share_pct": "abc",
+        }
+        errors = validate_relationship_data("OWNS", data)
+        assert any("share_pct must be a number" in e for e in errors)
+
+    def test_confidence_non_numeric(self):
+        data = {
+            "source_id": "s1",
+            "target_id": "t1",
+            "source_label": "Person",
+            "target_label": "Person",
+            "confidence": "high",
+        }
+        errors = validate_relationship_data("ASSOCIATED_WITH", data)
+        assert any("confidence must be a number" in e for e in errors)
