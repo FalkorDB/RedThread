@@ -257,3 +257,78 @@ class TestRecomputeRiskAPI:
         assert "total_entities" in data
         assert "label_stats" in data
         assert "top_risk" in data
+
+
+class TestRiskExceptionPaths:
+    """Test graceful fallback when queries fail during risk computation."""
+
+    def test_propagation_query_failure(self, seeded_graph):
+        """Cover lines 138-140: propagation exception sets propagated_risk to 0."""
+        from unittest.mock import patch
+
+        from src.graph.risk_scoring import compute_entity_risk
+
+        original_ro_query = seeded_graph.ro_query
+        call_count = 0
+
+        def failing_ro_query(query, params=None):
+            nonlocal call_count
+            call_count += 1
+            # First ro_query fetches entity (base risk) — let it pass
+            # Second + third ro_query do propagation — make them fail
+            if call_count >= 2 and "path" in query.lower():
+                raise RuntimeError("simulated propagation failure")
+            return original_ro_query(query, params=params)
+
+        with patch.object(seeded_graph, "ro_query", side_effect=failing_ro_query):
+            risk = compute_entity_risk(seeded_graph, "test-o1", depth=2)
+
+        assert risk["entity_id"] == "test-o1"
+        # Propagated risk should be 0 due to the exception
+        assert risk["propagated_risk"] == 0.0
+
+    def test_transaction_query_failure(self, seeded_graph):
+        """Cover lines 163-164: transaction pattern exception is caught gracefully."""
+        from unittest.mock import patch
+
+        from src.graph.risk_scoring import compute_entity_risk
+
+        original_ro_query = seeded_graph.ro_query
+        call_count = 0
+
+        def failing_ro_query(query, params=None):
+            nonlocal call_count
+            call_count += 1
+            # Let base risk and propagation queries pass
+            # Fail on the TRANSFERRED_TO query (transaction patterns)
+            if "TRANSFERRED_TO" in query:
+                raise RuntimeError("simulated transaction query failure")
+            return original_ro_query(query, params=params)
+
+        with patch.object(seeded_graph, "ro_query", side_effect=failing_ro_query):
+            risk = compute_entity_risk(seeded_graph, "test-o1", depth=2)
+
+        assert risk["entity_id"] == "test-o1"
+        # Should still have a valid risk score (just without transaction factor)
+        assert risk["risk_score"] >= 0
+
+    def test_risk_score_update_failure(self, seeded_graph):
+        """Cover lines 180-181: risk_score SET query failure is caught."""
+        from unittest.mock import patch
+
+        from src.graph.risk_scoring import compute_entity_risk
+
+        original_query = seeded_graph.query
+
+        def failing_query(q, params=None):
+            if "SET n.risk_score" in q:
+                raise RuntimeError("simulated write failure")
+            return original_query(q, params=params)
+
+        with patch.object(seeded_graph, "query", side_effect=failing_query):
+            risk = compute_entity_risk(seeded_graph, "test-o1", depth=2)
+
+        # Computation should still return valid results despite update failure
+        assert risk["entity_id"] == "test-o1"
+        assert risk["risk_score"] >= 0
+        assert "factors" in risk
