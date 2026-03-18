@@ -9,6 +9,10 @@ class TestAPIEntities:
         assert res.status_code == 200
         data = res.json()
         assert data["status"] in ["healthy", "degraded"]
+        assert "falkordb" in data
+        assert "graph" in data
+        assert "version" in data
+        assert data["version"] == "0.1.0"
 
     def test_create_and_get_person(self, test_client):
         res = test_client.post(
