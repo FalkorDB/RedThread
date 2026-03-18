@@ -246,3 +246,19 @@ def validate_graph_data() -> dict[str, Any]:
     from src.graph.validation import validate_graph
 
     return validate_graph(db)
+
+
+@router.get("/communities")
+def detect_communities(
+    max_communities: int = Query(20, ge=1, le=50),
+    min_size: int = Query(2, ge=2, le=10),
+) -> dict[str, Any]:
+    """Detect communities / clusters in the entity graph.
+
+    Uses connected-component analysis with density metrics to identify
+    tightly-knit groups of entities. Useful for finding organized crime
+    rings, corporate structures, and money laundering networks.
+    """
+    return analytics.detect_communities(
+        db, max_communities=max_communities, min_community_size=min_size
+    )

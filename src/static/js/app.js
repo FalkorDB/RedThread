@@ -546,6 +546,54 @@ class RedThreadApp {
         }
     }
 
+    async detectCommunities() {
+        toast('Detecting communities...', 'info');
+        try {
+            const data = await API.detectCommunities();
+            const panel = document.getElementById('analysis-panel');
+            panel.classList.add('open');
+            const content = document.getElementById('analysis-content');
+
+            let html = `<h3>🏘️ Community Detection</h3>
+                <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+                    <span style="background:var(--bg-tertiary);padding:3px 8px;border-radius:4px;font-size:12px"><strong>${data.total_communities}</strong> communities</span>
+                    <span style="background:var(--bg-tertiary);padding:3px 8px;border-radius:4px;font-size:12px"><strong>${data.cross_community_edges || 0}</strong> cross-links</span>
+                    <span style="background:var(--bg-tertiary);padding:3px 8px;border-radius:4px;font-size:12px">modularity: <strong>${data.modularity_estimate || 0}</strong></span>
+                </div>`;
+
+            if (data.communities.length === 0) {
+                html += '<p style="color:var(--text-secondary);font-size:12px">No communities detected (graph may be too sparse).</p>';
+            } else {
+                const colors = ['#3b82f6', '#8b5cf6', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+                data.communities.forEach((comm, i) => {
+                    const color = colors[i % colors.length];
+                    html += `<div style="margin-top:10px;border-left:3px solid ${color};padding-left:8px">
+                        <h4 style="font-size:12px;margin-bottom:4px">${escapeHtml(comm.id)} — ${comm.size} members (density: ${comm.density})</h4>`;
+                    if (comm.member_details) {
+                        comm.member_details.slice(0, 10).forEach(m => {
+                            html += `<div class="entity-item" style="margin-bottom:2px;cursor:pointer" data-id="${escapeHtml(m.id)}">
+                                <span class="entity-badge badge-${(m.label || 'unknown').toLowerCase()}">${(m.label || '?')[0]}</span>
+                                <span class="entity-name">${escapeHtml(m.name || m.id)}</span>
+                            </div>`;
+                        });
+                        if (comm.size > 10) {
+                            html += `<p style="font-size:10px;color:var(--text-secondary)">...and ${comm.size - 10} more</p>`;
+                        }
+                    }
+                    html += '</div>';
+                });
+            }
+
+            content.innerHTML = html;
+            content.querySelectorAll('.entity-item[data-id]').forEach(el => {
+                el.addEventListener('click', () => this._focusEntityById(el.dataset.id));
+            });
+            toast(`${data.total_communities} communities detected`, 'success');
+        } catch {
+            toast('Community detection failed', 'error');
+        }
+    }
+
     startSharedConnections() {
         if (!this.currentEntity) {
             toast('Select a first entity, then click "Shared Connections" again', 'warning');
