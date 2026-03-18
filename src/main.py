@@ -82,6 +82,12 @@ def shutdown() -> None:
     logger.info("redthread_shutdown")
 
 
+@app.exception_handler(ValueError)
+async def value_error_handler(request: Request, exc: ValueError) -> JSONResponse:
+    logger.warning("validation_error", path=request.url.path, error=str(exc))
+    return JSONResponse(status_code=422, content={"error": str(exc)})
+
+
 @app.exception_handler(RedisResponseError)
 async def redis_response_error_handler(request: Request, exc: RedisResponseError) -> JSONResponse:
     msg = str(exc)

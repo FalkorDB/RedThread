@@ -10,6 +10,7 @@ from typing import Any
 import structlog
 
 from src.database.falkordb_client import FalkorDBClient
+from src.graph.cypher_utils import validate_label, validate_rel_type
 
 logger = structlog.get_logger(__name__)
 
@@ -24,6 +25,7 @@ def _new_id() -> str:
 
 def create_entity(client: FalkorDBClient, label: str, properties: dict[str, Any]) -> dict[str, Any]:
     """Create a node with the given label and properties."""
+    validate_label(label)
     entity_id = properties.get("id") or _new_id()
     properties["id"] = entity_id
     properties["created_at"] = _now()
@@ -47,6 +49,7 @@ def create_entity(client: FalkorDBClient, label: str, properties: dict[str, Any]
 
 def get_entity(client: FalkorDBClient, label: str, entity_id: str) -> dict[str, Any] | None:
     """Get a single entity by label and ID."""
+    validate_label(label)
     query = f"MATCH (n:{label} {{id: $id}}) RETURN n"
     result = client.ro_query(query, params={"id": entity_id})
     if not result.result_set:
@@ -74,6 +77,7 @@ def update_entity(
     client: FalkorDBClient, label: str, entity_id: str, updates: dict[str, Any]
 ) -> dict[str, Any] | None:
     """Update entity properties."""
+    validate_label(label)
     updates["updated_at"] = _now()
     for key, val in updates.items():
         if isinstance(val, list):
@@ -94,6 +98,7 @@ def update_entity(
 
 def delete_entity(client: FalkorDBClient, label: str, entity_id: str) -> bool:
     """Delete an entity and all its relationships."""
+    validate_label(label)
     query = f"MATCH (n:{label} {{id: $id}}) DETACH DELETE n"
     result = client.query(query, params={"id": entity_id})
     deleted = result.nodes_deleted > 0 if hasattr(result, "nodes_deleted") else True
@@ -110,6 +115,7 @@ def list_entities(
     filters: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     """List entities of a given label with optional filters."""
+    validate_label(label)
     where_clauses = []
     params: dict[str, Any] = {}
 
@@ -136,6 +142,7 @@ def list_entities(
 
 def count_entities(client: FalkorDBClient, label: str) -> int:
     """Count entities of a given label."""
+    validate_label(label)
     query = f"MATCH (n:{label}) RETURN count(n) AS cnt"
     result = client.ro_query(query)
     return result.result_set[0][0] if result.result_set else 0
@@ -151,6 +158,9 @@ def create_relationship(
     properties: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Create a relationship between two nodes."""
+    validate_label(source_label)
+    validate_label(target_label)
+    validate_rel_type(rel_type)
     props = properties or {}
     props["created_at"] = _now()
 
@@ -201,6 +211,8 @@ def get_entity_relationships(
     limit: int = 100,
 ) -> list[dict[str, Any]]:
     """Get all relationships for an entity."""
+    if rel_type:
+        validate_rel_type(rel_type)
     rel_filter = f":{rel_type}" if rel_type else ""
 
     if direction == "outgoing":
@@ -234,6 +246,7 @@ def delete_relationship(
     rel_type: str,
 ) -> bool:
     """Delete a specific relationship."""
+    validate_rel_type(rel_type)
     query = f"MATCH (a {{id: $src_id}})-[r:{rel_type}]->(b {{id: $tgt_id}}) DELETE r"
     result = client.query(query, params={"src_id": source_id, "tgt_id": target_id})
     deleted = (
@@ -301,6 +314,7 @@ def search_entities(
     search_lower = query_text.lower()
 
     for label in target_labels:
+        validate_label(label)
         # Search by name or other identifying fields
         if label == "Account":
             search_field = "n.account_number"
