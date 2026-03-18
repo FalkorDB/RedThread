@@ -1,11 +1,14 @@
-"""Export API endpoints — subgraph export, report generation."""
+"""Export API endpoints — subgraph export, report generation, CSV export."""
 
 from __future__ import annotations
 
+import csv
+import io
 from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import StreamingResponse
 
 from src.database.falkordb_client import db
 from src.graph import analytics, queries
@@ -110,3 +113,116 @@ def full_graph_snapshot(
         "entities": all_entities,
         "entity_count": len(all_entities),
     }
+
+
+@router.get("/entities/csv")
+def export_entities_csv(
+    label: str = Query(..., description="Entity label to export"),
+    limit: int = Query(1000, ge=1, le=10000),
+) -> StreamingResponse:
+    """Export entities of a given label as a CSV file."""
+    from src.graph.cypher_utils import validate_label
+
+    validate_label(label)
+    entities = queries.list_entities(db, label, skip=0, limit=limit)
+    if not entities:
+        raise HTTPException(404, f"No entities found for label: {label}")
+
+    return _entities_to_csv(entities, label)
+
+
+@router.get("/relationships/csv")
+def export_relationships_csv(
+    rel_type: str | None = Query(None, description="Filter by relationship type"),
+    limit: int = Query(1000, ge=1, le=10000),
+) -> StreamingResponse:
+    """Export relationships as a CSV file."""
+    from src.graph.cypher_utils import validate_rel_type
+
+    if rel_type:
+        validate_rel_type(rel_type)
+        rel_filter = f":{rel_type}"
+    else:
+        rel_filter = ""
+
+    query = (
+        f"MATCH (a)-[r{rel_filter}]->(b) "
+        "RETURN a.id, labels(a)[0], type(r), b.id, labels(b)[0], "
+        "r.amount, r.valid_from, r.valid_to, r.created_at "
+        "LIMIT $limit"
+    )
+    result = db.ro_query(query, params={"limit": limit})
+
+    rows = []
+    for row in result.result_set:
+        rows.append(
+            {
+                "source_id": row[0],
+                "source_label": row[1] or "",
+                "rel_type": row[2],
+                "target_id": row[3],
+                "target_label": row[4] or "",
+                "amount": row[5] if row[5] is not None else "",
+                "valid_from": row[6] or "",
+                "valid_to": row[7] or "",
+                "created_at": row[8] or "",
+            }
+        )
+
+    if not rows:
+        type_desc = rel_type or "any type"
+        raise HTTPException(404, f"No relationships found for: {type_desc}")
+
+    output = io.StringIO()
+    fieldnames = [
+        "source_id",
+        "source_label",
+        "rel_type",
+        "target_id",
+        "target_label",
+        "amount",
+        "valid_from",
+        "valid_to",
+        "created_at",
+    ]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+
+    filename = f"relationships_{rel_type or 'all'}_{datetime.now(UTC).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _entities_to_csv(entities: list[dict[str, Any]], label: str) -> StreamingResponse:
+    """Convert entity list to a CSV streaming response."""
+    if not entities:
+        return StreamingResponse(
+            iter([""]),
+            media_type="text/csv",
+        )
+
+    # Collect all unique keys across entities
+    all_keys: set[str] = set()
+    for e in entities:
+        all_keys.update(e.keys())
+
+    # Put important columns first
+    priority = ["id", "name", "account_number", "label"]
+    fieldnames = [k for k in priority if k in all_keys]
+    fieldnames += sorted(all_keys - set(priority))
+
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    writer.writerows(entities)
+
+    filename = f"{label.lower()}_{datetime.now(UTC).strftime('%Y%m%d')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
