@@ -1149,6 +1149,117 @@ class RedThreadApp {
         }
     }
 
+    // === Data Import ===
+    importData() {
+        const panel = document.getElementById('analysis-panel');
+        panel.classList.add('open');
+        const content = document.getElementById('analysis-content');
+
+        const labels = ['Person', 'Organization', 'Account', 'Property', 'Event', 'Document', 'Address'];
+
+        let html = `<h3>📤 Import Data</h3>
+            <div style="margin-bottom:16px;padding:12px;background:var(--bg-elevated);border-radius:8px;border:1px solid var(--border)">
+                <h4 style="font-size:12px;margin-bottom:8px">JSON Import</h4>
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Upload a JSON file with entities and relationships</p>
+                <input type="file" id="import-json-file" accept=".json" style="font-size:11px;margin-bottom:8px;display:block">
+                <button class="btn btn-primary" onclick="app._uploadJson()" style="font-size:11px;padding:4px 12px">Upload JSON</button>
+            </div>
+            <div style="padding:12px;background:var(--bg-elevated);border-radius:8px;border:1px solid var(--border)">
+                <h4 style="font-size:12px;margin-bottom:8px">CSV Import</h4>
+                <p style="font-size:11px;color:var(--text-secondary);margin-bottom:8px">Upload a CSV file for a specific entity type or relationship type</p>
+                <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+                    <select id="import-csv-mode" style="font-size:11px;padding:2px 4px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:4px" onchange="app._updateCsvTypeOptions()">
+                        <option value="entities">Entities</option>
+                        <option value="relationships">Relationships</option>
+                    </select>
+                    <select id="import-csv-type" style="font-size:11px;padding:2px 4px;background:var(--bg-elevated);color:var(--text-primary);border:1px solid var(--border);border-radius:4px;flex:1">`;
+        labels.forEach(l => { html += `<option value="${l}">${l}</option>`; });
+        html += `</select>
+                </div>
+                <input type="file" id="import-csv-file" accept=".csv" style="font-size:11px;margin-bottom:8px;display:block">
+                <button class="btn btn-primary" onclick="app._uploadCsv()" style="font-size:11px;padding:4px 12px">Upload CSV</button>
+            </div>
+            <div id="import-results" style="margin-top:12px"></div>`;
+        content.innerHTML = html;
+    }
+
+    _updateCsvTypeOptions() {
+        const mode = document.getElementById('import-csv-mode').value;
+        const typeSelect = document.getElementById('import-csv-type');
+        typeSelect.innerHTML = '';
+        if (mode === 'entities') {
+            ['Person', 'Organization', 'Account', 'Property', 'Event', 'Document', 'Address'].forEach(l => {
+                typeSelect.innerHTML += `<option value="${l}">${l}</option>`;
+            });
+        } else {
+            ['ASSOCIATED_WITH', 'CONTACTED', 'DIRECTS', 'EMPLOYED_BY', 'LOCATED_AT', 'MENTIONED_IN', 'OWNS', 'PARTICIPATED_IN', 'RELATED_TO', 'SUBSIDIARY_OF', 'TRANSFERRED_TO'].forEach(rt => {
+                typeSelect.innerHTML += `<option value="${rt}">${rt.replace(/_/g, ' ')}</option>`;
+            });
+        }
+    }
+
+    async _uploadJson() {
+        const fileInput = document.getElementById('import-json-file');
+        const file = fileInput?.files?.[0];
+        if (!file) { toast('Select a JSON file first', 'warning'); return; }
+        const resultsEl = document.getElementById('import-results');
+        resultsEl.innerHTML = '<div class="spinner"></div>';
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const resp = await fetch('/api/import/json', { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (!resp.ok) {
+                resultsEl.innerHTML = `<p style="color:var(--accent);font-size:12px">Error: ${escapeHtml(data.detail || JSON.stringify(data))}</p>`;
+                return;
+            }
+            this._showImportResults(data, resultsEl);
+        } catch {
+            resultsEl.innerHTML = '<p style="color:var(--accent);font-size:12px">Upload failed</p>';
+        }
+    }
+
+    async _uploadCsv() {
+        const fileInput = document.getElementById('import-csv-file');
+        const file = fileInput?.files?.[0];
+        if (!file) { toast('Select a CSV file first', 'warning'); return; }
+        const mode = document.getElementById('import-csv-mode').value;
+        const type = document.getElementById('import-csv-type').value;
+        const resultsEl = document.getElementById('import-results');
+        resultsEl.innerHTML = '<div class="spinner"></div>';
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const url = mode === 'entities'
+                ? `/api/import/csv/entities?label=${type}`
+                : `/api/import/csv/relationships?rel_type=${type}`;
+            const resp = await fetch(url, { method: 'POST', body: formData });
+            const data = await resp.json();
+            if (!resp.ok) {
+                resultsEl.innerHTML = `<p style="color:var(--accent);font-size:12px">Error: ${escapeHtml(data.detail || JSON.stringify(data))}</p>`;
+                return;
+            }
+            this._showImportResults(data, resultsEl);
+        } catch {
+            resultsEl.innerHTML = '<p style="color:var(--accent);font-size:12px">Upload failed</p>';
+        }
+    }
+
+    _showImportResults(data, el) {
+        const entities = data.imported_entities ?? 0;
+        const rels = data.imported_relationships ?? data.imported ?? 0;
+        const entityErrs = data.entity_errors?.length ?? 0;
+        const relErrs = data.relationship_errors?.length ?? data.errors?.length ?? 0;
+        let html = `<div style="padding:8px;border-radius:6px;background:var(--bg-elevated);border:1px solid var(--border)">
+            <p style="font-size:12px;color:var(--text-primary)">✅ Imported: <strong>${entities}</strong> entities, <strong>${rels}</strong> relationships</p>`;
+        if (entityErrs > 0 || relErrs > 0) {
+            html += `<p style="font-size:11px;color:var(--accent);margin-top:4px">⚠️ ${entityErrs} entity errors, ${relErrs} relationship errors</p>`;
+        }
+        html += '</div>';
+        el.innerHTML = html;
+        toast(`Import complete: ${entities} entities, ${rels} relationships`, 'success');
+    }
+
     exportCSV() {
         const panel = document.getElementById('analysis-panel');
         panel.classList.add('open');
