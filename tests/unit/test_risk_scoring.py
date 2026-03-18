@@ -203,3 +203,57 @@ class TestHighestRiskEntities:
 
         results = get_highest_risk_entities(clean_graph, limit=5)
         assert results == []
+
+
+class TestRecomputeAllRiskScores:
+    """Test bulk risk recomputation."""
+
+    def test_recompute_returns_summary(self, seeded_graph):
+        from src.graph.risk_scoring import recompute_all_risk_scores
+
+        result = recompute_all_risk_scores(seeded_graph, depth=2)
+        assert "total_entities" in result
+        assert result["total_entities"] >= 8  # seeded_graph has 8 entities
+        assert "label_stats" in result
+        assert "top_risk" in result
+
+    def test_recompute_per_label_stats(self, seeded_graph):
+        from src.graph.risk_scoring import recompute_all_risk_scores
+
+        result = recompute_all_risk_scores(seeded_graph, depth=2)
+        stats = result["label_stats"]
+        assert "Person" in stats
+        assert "Organization" in stats
+        assert stats["Organization"]["count"] >= 2
+        assert "avg_risk" in stats["Organization"]
+        assert "max_risk" in stats["Organization"]
+        assert "high_risk_count" in stats["Organization"]
+
+    def test_recompute_top_risk_sorted(self, seeded_graph):
+        from src.graph.risk_scoring import recompute_all_risk_scores
+
+        result = recompute_all_risk_scores(seeded_graph, depth=2)
+        top = result["top_risk"]
+        assert len(top) <= 10
+        scores = [e["risk_score"] for e in top]
+        assert scores == sorted(scores, reverse=True)
+
+    def test_recompute_empty_graph(self, clean_graph):
+        from src.graph.risk_scoring import recompute_all_risk_scores
+
+        result = recompute_all_risk_scores(clean_graph)
+        assert result["total_entities"] == 0
+        assert result["label_stats"] == {}
+        assert result["top_risk"] == []
+
+
+class TestRecomputeRiskAPI:
+    """Test the /api/analysis/risk/recompute endpoint."""
+
+    def test_recompute_endpoint(self, test_client):
+        resp = test_client.post("/api/analysis/risk/recompute")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "total_entities" in data
+        assert "label_stats" in data
+        assert "top_risk" in data

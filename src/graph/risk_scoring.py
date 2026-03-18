@@ -184,6 +184,49 @@ def compute_entity_risk(
     return risk_data
 
 
+def recompute_all_risk_scores(
+    client: FalkorDBClient,
+    depth: int = 3,
+) -> dict[str, Any]:
+    """Recompute risk scores for every entity in the graph.
+
+    Returns a summary with per-label statistics and the highest-risk entities.
+    """
+    query = "MATCH (n) WHERE n.id IS NOT NULL RETURN n.id AS eid, labels(n) AS lbls"
+    result = client.ro_query(query)
+
+    entity_ids: list[tuple[str, str]] = []
+    for row in result.result_set:
+        eid = row[0]
+        label = row[1][0] if row[1] else "Unknown"
+        entity_ids.append((eid, label))
+
+    results: list[dict[str, Any]] = []
+    per_label: dict[str, list[float]] = {}
+
+    for eid, label in entity_ids:
+        risk_data = compute_entity_risk(client, eid, depth=depth)
+        results.append(risk_data)
+        per_label.setdefault(label, []).append(risk_data["risk_score"])
+
+    label_stats = {}
+    for label, scores in per_label.items():
+        label_stats[label] = {
+            "count": len(scores),
+            "avg_risk": round(sum(scores) / len(scores), 2) if scores else 0,
+            "max_risk": round(max(scores), 2) if scores else 0,
+            "high_risk_count": sum(1 for s in scores if s >= 50),
+        }
+
+    top_risk = sorted(results, key=lambda r: r["risk_score"], reverse=True)[:10]
+
+    return {
+        "total_entities": len(results),
+        "label_stats": label_stats,
+        "top_risk": top_risk,
+    }
+
+
 def compute_network_risk(
     client: FalkorDBClient,
     entity_ids: list[str],

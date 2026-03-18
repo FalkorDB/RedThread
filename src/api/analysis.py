@@ -175,6 +175,17 @@ def highest_risk(
     return risk_scoring.get_highest_risk_entities(db, limit=limit)
 
 
+@router.post("/risk/recompute")
+def recompute_all_risk(
+    depth: int = Query(3, ge=1, le=5),
+) -> dict[str, Any]:
+    """Recompute risk scores for all entities in the graph.
+
+    Returns per-label statistics and the top-10 highest-risk entities.
+    """
+    return risk_scoring.recompute_all_risk_scores(db, depth=depth)
+
+
 @router.get("/centrality")
 def centrality(
     label: str | None = Query(None),
