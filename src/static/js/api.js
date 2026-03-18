@@ -67,6 +67,7 @@ const API = {
         API.get(`/api/analysis/shared-connections?entity1=${e1}&entity2=${e2}`),
     validateGraph: () => API.get('/api/analysis/validate'),
     recomputeRisk: () => API.post('/api/analysis/risk/recompute', {}),
+    detectCommunities: () => API.get('/api/analysis/communities'),
     timeline: (id) => API.get(`/api/analysis/timeline/${id}`),
     stats: () => API.get('/api/analysis/stats'),
 
