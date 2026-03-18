@@ -197,6 +197,39 @@ class TestDiffCurrentVsSnapshot:
         assert diff["compared_to"] == "current_live_graph"
         assert diff["summary"]["nodes_added"] >= 1
 
+    def test_diff_current_detects_modified_nodes(self, seeded_graph, sqlite_client):
+        """Modifying a node after snapshot should show in modified_nodes."""
+        from src.graph.diff import diff_current_vs_snapshot, snapshot_current_graph
+        from src.graph.queries import update_entity
+
+        snap = snapshot_current_graph(seeded_graph, sqlite_client, "inv-mod", "Before Mod")
+
+        update_entity(seeded_graph, "Person", "test-p1", {"name": "Changed Name"})
+
+        diff = diff_current_vs_snapshot(seeded_graph, sqlite_client, snap["snapshot_id"])
+        assert diff["summary"]["nodes_modified"] >= 1
+        mod_ids = [m["id"] for m in diff["modified_nodes"]]
+        assert "test-p1" in mod_ids
+        # Verify the changes dict contains the name change
+        mod = next(m for m in diff["modified_nodes"] if m["id"] == "test-p1")
+        assert "name" in mod["changes"]
+        assert mod["changes"]["name"]["new"] == "Changed Name"
+
+    def test_diff_current_detects_removed_nodes(self, seeded_graph, sqlite_client):
+        """Deleting a node after snapshot should show in removed_nodes."""
+        from src.graph.diff import diff_current_vs_snapshot, snapshot_current_graph
+        from src.graph.queries import create_entity, delete_entity
+
+        create_entity(seeded_graph, "Person", {"id": "cv-del", "name": "Delete Me"})
+        snap = snapshot_current_graph(seeded_graph, sqlite_client, "inv-del2", "With extra node")
+
+        delete_entity(seeded_graph, "Person", "cv-del")
+
+        diff = diff_current_vs_snapshot(seeded_graph, sqlite_client, snap["snapshot_id"])
+        assert diff["summary"]["nodes_removed"] >= 1
+        removed_ids = [n["id"] for n in diff["removed_nodes"]]
+        assert "cv-del" in removed_ids
+
     def test_diff_current_nonexistent_raises(self, seeded_graph, sqlite_client):
         from src.graph.diff import diff_current_vs_snapshot
 
