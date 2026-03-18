@@ -83,7 +83,43 @@ Viktor Kovacs, former Hungarian Minister of Infrastructure, is suspected of embe
 5. Click **📸 Compare Snapshots** and select both snapshots
 6. Review the diff — see exactly which nodes and relationships were removed, highlighted in the comparison view
 
-### 8. Ask Questions in Plain English (1 min)
+### 8. Detect Communities (1 min)
+
+1. Click **🏘️ Communities** in the sidebar Tools tab
+2. The algorithm finds clusters of tightly-connected entities
+3. Each community card shows: member count, density, internal edges
+4. Notice how the offshore shell companies form a tight cluster while the nominee directors form another
+5. Cross-community edges reveal the bridge points between clusters
+
+### 9. Check Data Quality (30 sec)
+
+1. Click **🩺 Data Quality** in the sidebar
+2. Review validation results: orphaned nodes, missing names, potential duplicates
+3. Useful before exporting or presenting investigation findings
+
+### 10. Tag Entities (1 min)
+
+1. Click **🏷️ Manage Tags** in the sidebar to create tags like "Suspect", "Verified", "Flagged"
+2. Choose custom colors for each tag
+3. Click on any entity in the graph, scroll to the **Tags** section
+4. Use the dropdown to assign tags — tags appear as colored chips
+5. Click **×** on a chip to remove a tag
+
+### 11. Export Data (1 min)
+
+1. Click **📥 Export CSV** in the sidebar
+2. Click any entity type button to download all entities of that type as CSV
+3. Click relationship type buttons to export relationships
+4. Great for importing into Excel, Pandas, or other analysis tools
+
+### 12. Import Data (1 min)
+
+1. Click **📤 Import Data** in the sidebar
+2. Upload a JSON file with entities and relationships, or CSV files per entity/relationship type
+3. Results show imported counts and any errors
+4. Use this to merge data from multiple investigations
+
+### 13. Ask Questions in Plain English (1 min)
 
 > **Requires** `LLM_API_KEY` to be configured. Without it, the NL query bar is disabled gracefully.
 
@@ -159,6 +195,46 @@ curl "http://localhost:8000/api/nlq/examples"
 curl -X POST "http://localhost:8000/api/nlq/translate" \
   -H "Content-Type: application/json" \
   -d '{"question": "Who directs organizations in the BVI?"}'
+
+# --- Community Detection ---
+
+# Find communities in the network
+curl "http://localhost:8000/api/analysis/communities"
+
+# --- Bridge & Connectivity Analysis ---
+
+# Find bridge entities (single points of failure in the network)
+curl "http://localhost:8000/api/analysis/bridges"
+
+# Entity reach — how far can an entity's influence extend?
+curl "http://localhost:8000/api/analysis/reach?entity_id=p-kovacs&max_depth=3"
+
+# Shared connections between two entities
+curl "http://localhost:8000/api/analysis/shared-connections?entity1=p-kovacs&entity2=p-yamamoto"
+
+# Hidden indirect connections (2+ hops)
+curl "http://localhost:8000/api/analysis/patterns/hidden-connections?entity1=p-kovacs&entity2=p-yamamoto"
+
+# --- Tags ---
+
+# List all tags
+curl "http://localhost:8000/api/investigations/tags/all"
+
+# Create a tag
+curl -X POST "http://localhost:8000/api/investigations/tags" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Suspect", "color": "#ff4444"}'
+
+# Tag an entity (use tag_id from creation response)
+curl -X POST "http://localhost:8000/api/investigations/tags/p-kovacs/TAG_ID"
+
+# --- CSV Export ---
+
+# Export all persons as CSV
+curl -o persons.csv "http://localhost:8000/api/export/entities/csv?label=Person"
+
+# Export all transfers as CSV
+curl -o transfers.csv "http://localhost:8000/api/export/relationships/csv?rel_type=TRANSFERRED_TO"
 ```
 
 ## Seed Data Summary
