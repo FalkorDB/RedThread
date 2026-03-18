@@ -21,6 +21,10 @@ def degree_centrality(
     High degree centrality often indicates key players, hubs, or
     entities worth investigating more deeply.
     """
+    if label:
+        from src.graph.cypher_utils import validate_label
+
+        validate_label(label)
     label_filter = f":{label}" if label else ""
     query = (
         f"MATCH (n{label_filter})-[r]-() "
@@ -51,6 +55,10 @@ def betweenness_proxy(
     This proxy finds entities connected to many different entity types
     or entities in different clusters (by jurisdiction/nationality).
     """
+    if label:
+        from src.graph.cypher_utils import validate_label
+
+        validate_label(label)
     label_filter = f":{label}" if label else ""
     query = (
         f"MATCH (n{label_filter})-[r]-(m) "

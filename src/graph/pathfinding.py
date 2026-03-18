@@ -8,6 +8,7 @@ import structlog
 
 from src.config import settings
 from src.database.falkordb_client import FalkorDBClient
+from src.graph.cypher_utils import build_rel_filter
 
 logger = structlog.get_logger(__name__)
 
@@ -26,11 +27,7 @@ def find_all_paths(
     that would require recursive CTEs in SQL.
     """
     depth = min(max_depth or settings.max_path_depth, settings.max_path_depth)
-
-    if rel_types:
-        rel_filter = ":" + "|".join(rel_types)
-    else:
-        rel_filter = ""
+    rel_filter = build_rel_filter(rel_types)
 
     query = (
         f"MATCH path = (a {{id: $src}})-[{rel_filter}*1..{depth}]-(b {{id: $tgt}}) "
@@ -57,10 +54,7 @@ def find_shortest_path(
     rel_types: list[str] | None = None,
 ) -> dict[str, Any] | None:
     """Find the shortest path between two entities."""
-    if rel_types:
-        rel_filter = ":" + "|".join(rel_types)
-    else:
-        rel_filter = ""
+    rel_filter = build_rel_filter(rel_types)
 
     # FalkorDB requires directed shortestPath
     query = (
