@@ -39,13 +39,19 @@ Find "smurfing" patterns — multiple transactions just below reporting threshol
 Compute entity risk scores through network propagation: high-risk jurisdictions, connected suspicious entities, and transaction patterns all contribute, with risk diminishing by graph distance.
 
 ### 📊 Network Analytics
-Degree centrality (most connected entities), bridge detection (entities connecting otherwise isolated groups), shared connections, and entity timelines.
+Degree centrality (most connected entities), bridge detection (entities connecting otherwise isolated groups), shared connections, entity timelines, and community/cluster detection.
+
+### 🏘️ Community Detection
+Discover clusters and organized groups in the network using connected-component analysis with density metrics. Identify crime rings, corporate structures, and money laundering networks. View modularity scores and cross-community connections.
+
+### 🕵️ Hidden Connections
+Find indirect links between two entities through 2+ hop intermediaries — the core investigation value proposition. Select two entities and discover non-obvious connections the direct relationship view would miss.
 
 ### 🔍 Interactive Graph Visualization
 Explore the network visually — click to expand, double-click to explore neighbors, drag to rearrange. Color-coded by entity type with risk-based sizing.
 
-### 📁 Data Import
-Import entities and relationships via CSV or JSON. Column mapping, validation, and entity resolution built in.
+### 📁 Data Import & Export
+Import entities and relationships via CSV or JSON with validation and entity resolution. Export entities and relationships as CSV for external analysis, or as JSON subgraphs and investigation reports.
 
 ### 📋 Case Management
 Create investigations, pin entities of interest, save graph snapshots, tag entities, and export reports.
@@ -168,7 +174,13 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | GET | `/api/analysis/patterns/structuring` | Detect structuring |
 | GET | `/api/analysis/patterns/hidden-connections?entity1=X&entity2=Y` | Hidden connections |
 | GET | `/api/analysis/risk/{entity_id}` | Compute risk score |
+| GET | `/api/analysis/risk` | Highest risk entities |
+| POST | `/api/analysis/risk/recompute` | Recompute all risk scores |
 | GET | `/api/analysis/centrality` | Most connected entities |
+| GET | `/api/analysis/bridges` | Bridge entities |
+| GET | `/api/analysis/shared-connections?entity1=X&entity2=Y` | Shared connections |
+| GET | `/api/analysis/communities` | Community detection |
+| GET | `/api/analysis/validate` | Data quality validation |
 | GET | `/api/analysis/timeline/{entity_id}` | Entity activity timeline |
 | GET | `/api/analysis/stats` | Graph statistics |
 
@@ -178,7 +190,11 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | GET/POST | `/api/investigations/` | List/create investigations |
 | GET | `/api/investigations/{id}` | Get investigation with entities |
 | POST | `/api/investigations/{id}/entities` | Add entity to investigation |
-| POST | `/api/investigations/{id}/snapshots` | Save graph snapshot |
+| DELETE | `/api/investigations/{id}/entities` | Remove entity from investigation |
+| GET/POST | `/api/investigations/tags/` | List/create tags |
+| DELETE | `/api/investigations/tags/{tag_id}` | Delete a tag |
+| POST | `/api/investigations/tags/{tag_id}/entities/{entity_id}` | Tag an entity |
+| DELETE | `/api/investigations/tags/{tag_id}/entities/{entity_id}` | Untag an entity |
 
 ### Import/Export
 | Method | Endpoint | Description |
@@ -188,6 +204,9 @@ All endpoints return JSON. Interactive docs at `/docs` (Swagger UI).
 | POST | `/api/import/json/inline` | Import from inline JSON body |
 | GET | `/api/export/subgraph?entity_id=X` | Export subgraph as JSON |
 | GET | `/api/export/report?entity_id=X` | Generate entity report |
+| GET | `/api/export/graph-snapshot` | Full graph export as JSON |
+| GET | `/api/export/entities/csv?label=Person` | Export entities as CSV |
+| GET | `/api/export/relationships/csv` | Export relationships as CSV |
 
 ### Temporal Analysis
 | Method | Endpoint | Description |
